@@ -1,0 +1,212 @@
+{
+  "id": "deadlock",
+  "version": 4,
+  "name": "Deadlock",
+  "games": [
+    "steam-1422450"
+  ],
+  "config": {
+    "path": "{steam}/userdata/*/1422450/local/cfg/video.txt",
+    "format": "kv"
+  },
+  "processes": [
+    "deadlock.exe"
+  ],
+  "demandGpu": "GTX 1060",
+  "note": "Las fuentes coinciden: las sombras son lo que más pesa (15-20 % según Dodge.gg), las partículas hunden los FPS en peleas de equipo y la oclusión ambiental cuesta un 5-8 %.",
+  "sources": [
+    {
+      "name": "FrameCoach",
+      "url": "https://theframecoach.com/best-settings/amd-rx-6600/deadlock"
+    },
+    {
+      "name": "Dodge.gg",
+      "url": "https://www.dodge.gg/en-US/deadlock/news/deadlock-system-requirements-optimization-guide-2026"
+    },
+    {
+      "name": "EVEzone",
+      "url": "https://evezone.evetech.co.za/game-desk/best-deadlock-pc-settings-for-maximum-fps-in-2026"
+    }
+  ],
+  "settings": [
+    {
+      "key": "setting.r_citadel_shadow_quality",
+      "label": "Sombras",
+      "visual": 2,
+      "why": "El ajuste más caro: de Alto a Medio se ahorra mucho y apenas se nota en partida (FrameCoach, Dodge.gg).",
+      "levels": [
+        [
+          "1",
+          "Bajas",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "2",
+          "Medias",
+          8,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "3",
+          "Altas",
+          17,
+          {
+            "cpu": 4
+          }
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_citadel_ssao_quality",
+      "label": "Oclusión ambiental",
+      "visual": 1,
+      "why": "Cuesta un 5-8 % de GPU y apenas se aprecia en movimiento (Dodge.gg).",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Baja",
+          2
+        ],
+        [
+          "2",
+          "Media",
+          4
+        ],
+        [
+          "3",
+          "Alta",
+          7
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_arealights",
+      "label": "Luces de área",
+      "visual": 1,
+      "why": "Iluminación más realista con un coste apreciable.",
+      "levels": [
+        [
+          "false",
+          "Desactivadas",
+          0
+        ],
+        [
+          "true",
+          "Activadas",
+          5
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_citadel_fog_quality",
+      "label": "Niebla",
+      "visual": 1,
+      "why": "Niebla baja alivia las peleas de equipo y mejora la visibilidad (Dodge.gg).",
+      "levels": [
+        [
+          "0",
+          "Baja",
+          0
+        ],
+        [
+          "1",
+          "Alta",
+          3
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_particle_depth_feathering",
+      "label": "Suavizado de partículas",
+      "visual": 1,
+      "why": "Las partículas son lo que más cae en peleas de equipo (FrameCoach).",
+      "levels": [
+        [
+          "false",
+          "Desactivado",
+          0
+        ],
+        [
+          "true",
+          "Activado",
+          3
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_depth_of_field",
+      "label": "Profundidad de campo",
+      "visual": 0.5,
+      "why": "Desenfoca el fondo; no ayuda a jugar.",
+      "levels": [
+        [
+          "false",
+          "Desactivada",
+          0
+        ],
+        [
+          "true",
+          "Activada",
+          2
+        ]
+      ]
+    },
+    {
+      "key": "setting.r_citadel_motion_blur",
+      "label": "Desenfoque de movimiento",
+      "why": "Emborrona la imagen al girar la cámara.",
+      "levels": [
+        [
+          "0",
+          "Desactivado"
+        ],
+        [
+          "1",
+          "Activado"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    },
+    {
+      "key": "setting.r_low_latency",
+      "label": "NVIDIA Reflex",
+      "requires": "nvidia",
+      "why": "Reduce el retraso entre el ratón y la pantalla sin perder FPS.",
+      "levels": [
+        [
+          "0",
+          "Desactivado"
+        ],
+        [
+          "1",
+          "Activado"
+        ],
+        [
+          "2",
+          "Activado + Boost"
+        ]
+      ],
+      "fixed": {
+        "fps": "2",
+        "equilibrado": "1",
+        "calidad": "1"
+      }
+    }
+  ],
+  "demandCpu": "Intel Core i5-7500 / AMD Ryzen 5 1600",
+  "demandRamGb": 16
+}

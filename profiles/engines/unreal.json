@@ -1,0 +1,413 @@
+{
+  "id": "unreal",
+  "version": 3,
+  "name": "Unreal Engine",
+  "note": "Perfil automático para juegos de Unreal Engine. Las guías de varios juegos coinciden en el orden de coste: iluminación global y sombras son lo más caro, luego volumétricos y reflejos; postprocesado, distancia de visión y vegetación pesan menos.",
+  "sources": [
+    {
+      "name": "Epic Games (documentación)",
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/scalability-reference-for-unreal-engine"
+    },
+    {
+      "name": "Tier1Settings (Avowed)",
+      "url": "https://tier1settings.com/best-avowed-settings-for-fps/"
+    },
+    {
+      "name": "CheckFPS (Bloodlines 2)",
+      "url": "https://checkfps.io/en/optimize-fps/vampire-bloodlines-2"
+    },
+    {
+      "name": "AllThings.how (Gothic Remake)",
+      "url": "https://allthings.how/?p=33245"
+    }
+  ],
+  "settings": [
+    {
+      "key": "sg.GlobalIlluminationQuality",
+      "label": "Iluminación global",
+      "visual": 2,
+      "why": "Suele ser lo más caro, sobre todo con Lumen en Unreal Engine 5 (Tier1Settings, CheckFPS).",
+      "levels": [
+        [
+          "0",
+          "Baja",
+          0
+        ],
+        [
+          "1",
+          "Media",
+          6
+        ],
+        [
+          "2",
+          "Alta",
+          12
+        ],
+        [
+          "3",
+          "Épica",
+          18
+        ]
+      ]
+    },
+    {
+      "key": "sg.ShadowQuality",
+      "label": "Sombras",
+      "visual": 2,
+      "why": "Lo segundo que más pesa en casi todos los juegos de Unreal (AllThings.how, CheckFPS).",
+      "levels": [
+        [
+          "0",
+          "Bajas",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Medias",
+          5,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "2",
+          "Altas",
+          10,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "3",
+          "Épicas",
+          15,
+          {
+            "cpu": 4
+          }
+        ]
+      ]
+    },
+    {
+      "key": "sg.VolumetricsQuality",
+      "label": "Niebla y volumétricos",
+      "visual": 1,
+      "why": "Lo siguiente a recortar tras iluminación y sombras (Tier1Settings).",
+      "levels": [
+        [
+          "0",
+          "Bajos",
+          0
+        ],
+        [
+          "1",
+          "Medios",
+          3
+        ],
+        [
+          "2",
+          "Altos",
+          6
+        ],
+        [
+          "3",
+          "Épicos",
+          9
+        ]
+      ]
+    },
+    {
+      "key": "sg.ReflectionQuality",
+      "label": "Reflejos",
+      "visual": 1,
+      "why": "Coste medio; en Unreal 5 van ligados a Lumen.",
+      "levels": [
+        [
+          "0",
+          "Bajos",
+          0
+        ],
+        [
+          "1",
+          "Medios",
+          3
+        ],
+        [
+          "2",
+          "Altos",
+          6
+        ],
+        [
+          "3",
+          "Épicos",
+          8
+        ]
+      ]
+    },
+    {
+      "key": "sg.EffectsQuality",
+      "label": "Efectos",
+      "visual": 2,
+      "why": "Partículas y explosiones: pesan en los momentos de más acción.",
+      "levels": [
+        [
+          "0",
+          "Bajos",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Medios",
+          2,
+          {
+            "cpu": 1
+          }
+        ],
+        [
+          "2",
+          "Altos",
+          4,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "3",
+          "Épicos",
+          6,
+          {
+            "cpu": 3
+          }
+        ]
+      ]
+    },
+    {
+      "key": "sg.ShadingQuality",
+      "label": "Sombreado",
+      "visual": 2,
+      "why": "Calidad de los materiales; coste moderado.",
+      "levels": [
+        [
+          "0",
+          "Bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          2
+        ],
+        [
+          "2",
+          "Alto",
+          4
+        ],
+        [
+          "3",
+          "Épico",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "sg.PostProcessQuality",
+      "label": "Postprocesado",
+      "visual": 1,
+      "why": "Pesa menos que la iluminación; en bajo la imagen suele verse más limpia (AllThings.how).",
+      "levels": [
+        [
+          "0",
+          "Bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          2
+        ],
+        [
+          "2",
+          "Alto",
+          4
+        ],
+        [
+          "3",
+          "Épico",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "sg.ViewDistanceQuality",
+      "label": "Distancia de visión",
+      "visual": 2,
+      "why": "Más objetos que dibujar a lo lejos: carga sobre todo el procesador; se nota en mapas abiertos.",
+      "levels": [
+        [
+          "0",
+          "Baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Media",
+          2,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "2",
+          "Alta",
+          3,
+          {
+            "cpu": 6
+          }
+        ],
+        [
+          "3",
+          "Épica",
+          5,
+          {
+            "cpu": 9
+          }
+        ]
+      ]
+    },
+    {
+      "key": "sg.FoliageQuality",
+      "label": "Vegetación",
+      "visual": 1,
+      "why": "Pesa en bosques densos; coste bajo en el resto.",
+      "levels": [
+        [
+          "0",
+          "Baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Media",
+          2,
+          {
+            "cpu": 1
+          }
+        ],
+        [
+          "2",
+          "Alta",
+          3,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "3",
+          "Épica",
+          5,
+          {
+            "cpu": 3
+          }
+        ]
+      ]
+    },
+    {
+      "key": "sg.AntiAliasingQuality",
+      "label": "Antialiasing",
+      "visual": 2,
+      "why": "Coste bajo y mejora mucho la imagen.",
+      "levels": [
+        [
+          "0",
+          "Bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          2
+        ],
+        [
+          "2",
+          "Alto",
+          3
+        ],
+        [
+          "3",
+          "Épico",
+          4
+        ]
+      ]
+    },
+    {
+      "key": "sg.TextureQuality",
+      "label": "Texturas",
+      "why": "No cuestan FPS mientras quepan en la memoria de tu gráfica.",
+      "levels": [
+        [
+          "0",
+          "Bajas",
+          0,
+          {
+            "vram": 0
+          }
+        ],
+        [
+          "1",
+          "Medias",
+          0,
+          {
+            "vram": 3
+          }
+        ],
+        [
+          "2",
+          "Altas",
+          0,
+          {
+            "vram": 5
+          }
+        ],
+        [
+          "3",
+          "Épicas",
+          0,
+          {
+            "vram": 8
+          }
+        ]
+      ]
+    },
+    {
+      "key": "bUseVSync",
+      "label": "Sincronización vertical",
+      "why": "Añade retraso de entrada.",
+      "levels": [
+        [
+          "False",
+          "Desactivada"
+        ],
+        [
+          "True",
+          "Activada"
+        ]
+      ],
+      "fixed": {
+        "fps": "False",
+        "equilibrado": "False",
+        "calidad": "False"
+      }
+    }
+  ]
+}

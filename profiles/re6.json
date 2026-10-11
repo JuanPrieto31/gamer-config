@@ -1,0 +1,29 @@
+{
+  "id": "re6",
+  "version": 3,
+  "name": "Resident Evil 6",
+  "games": ["steam-221040"],
+  "config": { "path": "{docs}/CAPCOM/RESIDENT EVIL 6/config.ini", "format": "ini" },
+  "processes": ["BH6.exe"],
+  "note": "Es un juego de 2012: casi cualquier gráfica actual lo mueve al máximo.",
+  "sources": [],
+  "settings": [
+    { "key": "GRAPHICS.ShadowsQuality", "label": "Sombras", "visual": 2,
+      "why": "El ajuste más caro del juego.",
+      "levels": [["LOW", "Bajas", 0], ["MEDIUM", "Medias", 3], ["HIGH", "Altas", 6]] },
+    { "key": "GRAPHICS.ScreenQuality", "label": "Calidad de imagen", "visual": 2,
+      "why": "Efectos de postprocesado.",
+      "levels": [["LOW", "Baja", 0], ["MEDIUM", "Media", 2], ["HIGH", "Alta", 4]] },
+    { "key": "GRAPHICS.TextureDetail", "label": "Texturas",
+      "why": "No cuestan FPS mientras quepan en la memoria de tu gráfica.",
+      "levels": [["LOW", "Bajas", 0, { "vram": 0 }], ["MEDIUM", "Medias", 0, { "vram": 1 }], ["HIGH", "Altas", 0, { "vram": 1.5 }]] },
+    { "key": "GRAPHICS.MotionBlurEnabled", "label": "Desenfoque de movimiento",
+      "why": "Emborrona la imagen al girar la cámara.",
+      "levels": [["OFF", "Desactivado"], ["ON", "Activado"]],
+      "fixed": { "fps": "OFF", "equilibrado": "OFF", "calidad": "OFF" } },
+    { "key": "DISPLAY.VSYNC", "label": "Sincronización vertical",
+      "why": "Añade retraso de entrada.",
+      "levels": [["OFF", "Desactivada"], ["ON", "Activada"]],
+      "fixed": { "fps": "OFF", "equilibrado": "OFF", "calidad": "OFF" } }
+  ]
+}

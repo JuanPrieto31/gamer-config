@@ -1,0 +1,275 @@
+{
+  "id": "apex",
+  "version": 4,
+  "name": "Apex Legends",
+  "games": [
+    "steam-1172470",
+    "epic-Sugar"
+  ],
+  "config": {
+    "path": "{userprofile}/Saved Games/Respawn/Apex/local/videoconfig.txt",
+    "format": "kv"
+  },
+  "processes": [
+    "r5apex.exe",
+    "r5apex_dx12.exe"
+  ],
+  "note": "Medido por PC Gamer: quitar la oclusión ambiental da un 15 % más de FPS y la iluminación volumétrica un 6 %; junto con las sombras del sol suman casi un 28 %. Las sombras dinámicas de focos casi no cambian nada.",
+  "sources": [
+    {
+      "name": "PC Gamer",
+      "url": "https://www.pcgamer.com/apex-legends-settings-performance/"
+    },
+    {
+      "name": "Tom's Hardware",
+      "url": "https://www.tomshardware.com/reviews/apex-legends-integrated-graphics,6032.html"
+    },
+    {
+      "name": "PCGamesN",
+      "url": "https://www.pcgamesn.com/apex-legends/apex-legends-nvidia-amd-pc-performance-benchmark"
+    },
+    {
+      "name": "Digital Trends",
+      "url": "https://www.digitaltrends.com/?p=3375999"
+    }
+  ],
+  "settings": [
+    {
+      "key": "setting.ssao_quality",
+      "label": "Oclusión ambiental",
+      "visual": 1,
+      "why": "El ajuste más caro: desactivarla da en torno a un 15 % más de FPS (PC Gamer).",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Media",
+          8
+        ],
+        [
+          "2",
+          "Alta",
+          15
+        ]
+      ]
+    },
+    {
+      "key": "setting.volumetric_lighting",
+      "label": "Iluminación volumétrica",
+      "visual": 1,
+      "why": "Cuesta en torno a un 6 % y además dificulta ver a los rivales (PC Gamer).",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Activada",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "setting.csm_coverage",
+      "label": "Cobertura de sombras del sol",
+      "visual": 1,
+      "why": "Junto con la oclusión y la volumétrica suma casi un 28 % (PC Gamer).",
+      "levels": [
+        [
+          "1",
+          "Baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "2",
+          "Alta",
+          4,
+          {
+            "cpu": 2
+          }
+        ]
+      ]
+    },
+    {
+      "key": "setting.csm_cascade_res",
+      "label": "Detalle de sombras del sol",
+      "visual": 2,
+      "why": "Las sombras en cascada son lo siguiente que más pesa en gráficas de entrada (Tom's Hardware).",
+      "levels": [
+        [
+          "512",
+          "Bajo",
+          0
+        ],
+        [
+          "1024",
+          "Alto",
+          3
+        ],
+        [
+          "2048",
+          "Muy alto",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "setting.shadow_enable",
+      "label": "Sombras dinámicas (focos)",
+      "visual": 2,
+      "why": "En las pruebas de PC Gamer casi no cambia los FPS.",
+      "levels": [
+        [
+          "0",
+          "Desactivadas",
+          0
+        ],
+        [
+          "1",
+          "Activadas",
+          1
+        ]
+      ]
+    },
+    {
+      "key": "setting.mat_antialias_mode",
+      "label": "Antialiasing",
+      "visual": 2,
+      "why": "El TSAA cuesta poco y evita que la imagen parpadee a distancia.",
+      "levels": [
+        [
+          "0",
+          "Desactivado",
+          0
+        ],
+        [
+          "12",
+          "TSAA",
+          3
+        ]
+      ]
+    },
+    {
+      "key": "setting.mat_forceaniso",
+      "label": "Filtro anisotrópico",
+      "visual": 2,
+      "why": "Texturas nítidas a distancia con un coste casi nulo.",
+      "levels": [
+        [
+          "1",
+          "Bilineal",
+          0
+        ],
+        [
+          "2",
+          "2x",
+          0.5
+        ],
+        [
+          "4",
+          "4x",
+          1
+        ],
+        [
+          "8",
+          "8x",
+          1.5
+        ],
+        [
+          "16",
+          "16x",
+          2
+        ]
+      ]
+    },
+    {
+      "key": "setting.cl_ragdoll_maxcount",
+      "label": "Cuerpos con física",
+      "visual": 0.5,
+      "why": "Cuántos cuerpos con física se simulan a la vez; carga la CPU.",
+      "levels": [
+        [
+          "0",
+          "Ninguno",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "4",
+          "Pocos",
+          1,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "8",
+          "Muchos",
+          2,
+          {
+            "cpu": 6
+          }
+        ]
+      ]
+    },
+    {
+      "key": "setting.mat_vsync_mode",
+      "label": "Sincronización vertical",
+      "why": "Añade retraso de entrada. Siempre desactivada en un shooter competitivo.",
+      "levels": [
+        [
+          "0",
+          "Desactivada"
+        ],
+        [
+          "1",
+          "Doble búfer"
+        ],
+        [
+          "2",
+          "Triple búfer"
+        ],
+        [
+          "3",
+          "Adaptativa"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    },
+    {
+      "key": "setting.dvs_enable",
+      "label": "Resolución adaptativa",
+      "why": "Cambia la resolución sola y emborrona la imagen; Gamer Config ya ajusta el resto para llegar a tus FPS.",
+      "levels": [
+        [
+          "0",
+          "Desactivada"
+        ],
+        [
+          "1",
+          "Activada"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    }
+  ]
+}

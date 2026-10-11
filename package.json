@@ -1,0 +1,59 @@
+{
+  "name": "gamer-config",
+  "productName": "Gamer Config",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "app": "npm run build && electron .",
+    "test": "electron electron/selftest.js",
+    "instalador": "npm run build && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.4",
+    "@phosphor-icons/core": "^2.1.1"
+  },
+  "allowScripts": {
+    "electron@44.7.0": true
+  },
+  "build": {
+    "appId": "com.gamerconfig.app",
+    "productName": "Gamer Config",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "!electron/selftest.js",
+      "profiles/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gamer Config",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Gamer Config Setup ${version}.${ext}"
+    },
+    "electronDist": "node_modules/electron/dist"
+  },
+  "description": "Optimiza Windows y tus juegos según tu PC",
+  "author": "Juan Andres Prieto"
+}

@@ -1,0 +1,257 @@
+{
+  "id": "lol",
+  "version": 4,
+  "name": "League of Legends",
+  "games": [
+    "riot-league_of_legends.live"
+  ],
+  "config": {
+    "path": "{install}/Config/game.cfg",
+    "format": "ini"
+  },
+  "processes": [
+    "League of Legends.exe"
+  ],
+  "demandGpu": "GeForce GTX 560 / Radeon HD 6950",
+  "note": "Todas las guías coinciden: las sombras son el ajuste que más FPS quita, seguidas de efectos y personajes. LoL depende mucho de la CPU; los bajones de verdad están en las peleas de equipo.",
+  "sources": [
+    {
+      "name": "Esports Tales",
+      "url": "https://esportstales.com/league-of-legends/how-to-increase-fps-video-settings-client-options"
+    },
+    {
+      "name": "EVEzone (144 Hz)",
+      "url": "https://evezone.evetech.co.za/game-desk/league-of-legends-best-settings-for-144hz-gaming"
+    },
+    {
+      "name": "EVEzone (equipos de entrada)",
+      "url": "https://evezone.evetech.co.za/deep-dives/low-end-pc-league-of-legends-guide-settings-to-play"
+    },
+    {
+      "name": "dor.gg",
+      "url": "https://clip.dor.gg/en/blog/lol-fps-boost-settings"
+    }
+  ],
+  "settings": [
+    {
+      "key": "Performance.ShadowQuality",
+      "label": "Sombras",
+      "visual": 2,
+      "why": "El ajuste que más FPS quita en peleas grandes según todas las guías.",
+      "levels": [
+        [
+          "0",
+          "Desactivadas",
+          0
+        ],
+        [
+          "1",
+          "Bajas",
+          6
+        ],
+        [
+          "2",
+          "Medias",
+          12
+        ],
+        [
+          "3",
+          "Altas",
+          18
+        ],
+        [
+          "4",
+          "Muy altas",
+          25
+        ]
+      ]
+    },
+    {
+      "key": "Performance.EffectsQuality",
+      "label": "Efectos",
+      "visual": 2,
+      "why": "Las habilidades en peleas de 5 contra 5 son lo siguiente que más pesa.",
+      "levels": [
+        [
+          "0",
+          "Muy bajos",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Bajos",
+          3,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "2",
+          "Medios",
+          6,
+          {
+            "cpu": 4
+          }
+        ],
+        [
+          "3",
+          "Altos",
+          9,
+          {
+            "cpu": 6
+          }
+        ],
+        [
+          "4",
+          "Muy altos",
+          12,
+          {
+            "cpu": 8
+          }
+        ]
+      ]
+    },
+    {
+      "key": "Performance.EnvironmentQuality",
+      "label": "Entorno",
+      "visual": 1,
+      "why": "Afecta poco al rendimiento.",
+      "levels": [
+        [
+          "0",
+          "Muy bajo",
+          0
+        ],
+        [
+          "1",
+          "Bajo",
+          2
+        ],
+        [
+          "2",
+          "Medio",
+          4
+        ],
+        [
+          "3",
+          "Alto",
+          6
+        ],
+        [
+          "4",
+          "Muy alto",
+          8
+        ]
+      ]
+    },
+    {
+      "key": "Performance.CharacterQuality",
+      "label": "Personajes",
+      "visual": 3,
+      "why": "Coste bajo; conviene mantenerlo alto para leer bien las animaciones.",
+      "levels": [
+        [
+          "0",
+          "Muy bajo",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Bajo",
+          1,
+          {
+            "cpu": 1
+          }
+        ],
+        [
+          "2",
+          "Medio",
+          2,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "3",
+          "Alto",
+          3,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "4",
+          "Muy alto",
+          4,
+          {
+            "cpu": 4
+          }
+        ]
+      ]
+    },
+    {
+      "key": "Performance.EnableFXAA",
+      "label": "Antialiasing (FXAA)",
+      "visual": 1,
+      "why": "Suaviza bordes con un coste mínimo, pero emborrona un poco la imagen.",
+      "levels": [
+        [
+          "0",
+          "Desactivado",
+          0
+        ],
+        [
+          "1",
+          "Activado",
+          2
+        ]
+      ]
+    },
+    {
+      "key": "General.HideEyeCandy",
+      "label": "Decoración del mapa",
+      "visual": 0.5,
+      "why": "Elementos decorativos que no aportan al juego.",
+      "levels": [
+        [
+          "1",
+          "Oculta",
+          0
+        ],
+        [
+          "0",
+          "Visible",
+          1
+        ]
+      ]
+    },
+    {
+      "key": "General.WaitForVerticalSync",
+      "label": "Sincronización vertical",
+      "why": "Añade retraso al ratón. Mejor desactivada en un juego competitivo.",
+      "levels": [
+        [
+          "0",
+          "Desactivada"
+        ],
+        [
+          "1",
+          "Activada"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    }
+  ],
+  "demandCpu": "Intel Core i5-3300 / AMD Ryzen 3 1200",
+  "demandRamGb": 8
+}

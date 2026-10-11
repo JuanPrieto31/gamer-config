@@ -1,0 +1,289 @@
+{
+  "id": "dyinglight",
+  "version": 4,
+  "name": "Dying Light",
+  "games": [
+    "steam-239140"
+  ],
+  "config": {
+    "path": "{docs}/DyingLight/out/settings/video.scr",
+    "format": "scr"
+  },
+  "processes": [
+    "DyingLightGame.exe"
+  ],
+  "note": "La distancia de visión es lo que más importa con diferencia: bajarla casi duplica los FPS mínimos y carga sobre todo la CPU (PCGamingWiki). El desenfoque de profundidad de NVIDIA cuesta mucho, y las sombras en Alto rinden casi igual que en Máximo (r/OptimizedGaming).",
+  "sources": [
+    {
+      "name": "PCGamingWiki",
+      "url": "https://community.pcgamingwiki.com/blog/features/port-reports/pc-report-dying-light-r176/"
+    },
+    {
+      "name": "r/OptimizedGaming",
+      "url": "https://www.reddit.com/r/OptimizedGaming/comments/105a882/dying_light_optimized_settings/"
+    },
+    {
+      "name": "NVIDIA",
+      "url": "https://www.nvidia.com/en-us/geforce/news/dying-light-graphics-and-performance-guide/"
+    }
+  ],
+  "settings": [
+    {
+      "key": "VisRange",
+      "label": "Distancia de visión",
+      "visual": 2,
+      "why": "Lo que más FPS cuesta con diferencia, y sobre todo al procesador: bajarla casi duplica los FPS mínimos (PCGamingWiki).",
+      "levels": [
+        [
+          "0.50, 0.50",
+          "Mínima",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "0.80, 0.80",
+          "Baja",
+          3,
+          {
+            "cpu": 10
+          }
+        ],
+        [
+          "1.20, 1.20",
+          "Media",
+          6,
+          {
+            "cpu": 22
+          }
+        ],
+        [
+          "1.60, 1.60",
+          "Alta",
+          10,
+          {
+            "cpu": 36
+          }
+        ],
+        [
+          "2.10, 2.10",
+          "Máxima",
+          15,
+          {
+            "cpu": 55
+          }
+        ]
+      ]
+    },
+    {
+      "key": "NvidiaEffects",
+      "label": "Efectos NVIDIA (HBAO+, desenfoque, PCSS)",
+      "visual": 1,
+      "why": "El desenfoque de profundidad cuesta mucho en partida; HBAO+ y PCSS son mejoras visuales caras (r/OptimizedGaming, NVIDIA).",
+      "levels": [
+        [
+          "0, 0, 0",
+          "Todos desactivados",
+          0
+        ],
+        [
+          "1, 0, 0",
+          "Solo HBAO+",
+          8
+        ],
+        [
+          "1, 0, 1",
+          "HBAO+ y PCSS",
+          18
+        ],
+        [
+          "1, 1, 1",
+          "Todos activados",
+          33
+        ]
+      ]
+    },
+    {
+      "key": "ShadowMapSize",
+      "label": "Calidad de sombras",
+      "visual": 2,
+      "why": "Alta rinde casi igual que Máxima y se ve prácticamente igual (r/OptimizedGaming).",
+      "levels": [
+        [
+          "512",
+          "Baja",
+          0
+        ],
+        [
+          "1024",
+          "Media",
+          3
+        ],
+        [
+          "2048",
+          "Alta",
+          6
+        ],
+        [
+          "4096",
+          "Muy alta",
+          12,
+          {
+            "visual": 0.5
+          }
+        ]
+      ]
+    },
+    {
+      "key": "SpotShadowMapSize",
+      "label": "Sombras de linternas y focos",
+      "visual": 2,
+      "why": "Resolución de las sombras de luces cercanas.",
+      "levels": [
+        [
+          "512",
+          "Baja",
+          0
+        ],
+        [
+          "1024",
+          "Media",
+          2
+        ],
+        [
+          "2048",
+          "Alta",
+          4
+        ],
+        [
+          "4096",
+          "Muy alta",
+          8,
+          {
+            "visual": 0.5
+          }
+        ]
+      ]
+    },
+    {
+      "key": "GrassQuality",
+      "label": "Calidad de la hierba",
+      "visual": 1,
+      "why": "En este juego, un número más bajo es más calidad.",
+      "levels": [
+        [
+          "3",
+          "Muy baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "2",
+          "Baja",
+          2,
+          {
+            "cpu": 1
+          }
+        ],
+        [
+          "1",
+          "Media",
+          4,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "0",
+          "Alta",
+          6,
+          {
+            "cpu": 3
+          }
+        ]
+      ]
+    },
+    {
+      "key": "AmbientOcclusion",
+      "label": "Oclusión ambiental",
+      "visual": 1,
+      "why": "Sombreado de contacto con un coste moderado.",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Activada",
+          4
+        ]
+      ]
+    },
+    {
+      "key": "TextureQuality",
+      "label": "Texturas",
+      "why": "No cuestan FPS mientras quepan en la memoria de tu gráfica.",
+      "levels": [
+        [
+          "\"Low\"",
+          "Bajas",
+          0,
+          {
+            "vram": 0
+          }
+        ],
+        [
+          "\"Medium\"",
+          "Medias",
+          0,
+          {
+            "vram": 2
+          }
+        ],
+        [
+          "\"High\"",
+          "Altas",
+          0,
+          {
+            "vram": 3
+          }
+        ]
+      ]
+    },
+    {
+      "key": "MotionBlur",
+      "label": "Desenfoque de movimiento",
+      "why": "Emborrona la imagen al correr o girar.",
+      "levels": [
+        [
+          "0",
+          "Desactivado"
+        ],
+        [
+          "1",
+          "Activado"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    },
+    {
+      "key": "MaxFPS",
+      "label": "Límite de FPS",
+      "why": "Igual a la frecuencia de tu pantalla: sin trabajo de más.",
+      "fixed": {
+        "fps": "{refresh}",
+        "equilibrado": "{refresh}",
+        "calidad": "{refresh}"
+      }
+    }
+  ]
+}

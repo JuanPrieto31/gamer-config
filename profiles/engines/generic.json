@@ -1,0 +1,384 @@
+{
+  "id": "generic",
+  "version": 3,
+  "name": "Guía general",
+  "note": "Este juego guarda su configuración de una forma que Gamer Config todavía no sabe editar. Pon estos valores en el menú de gráficos del juego: están calculados para tu gráfica y lo que pide el juego.",
+  "sources": [
+    {
+      "name": "Tier1Settings",
+      "url": "https://tier1settings.com/best-avowed-settings-for-fps/"
+    },
+    {
+      "name": "AllThings.how",
+      "url": "https://allthings.how/?p=33245"
+    },
+    {
+      "name": "PC Gamer",
+      "url": "https://www.pcgamer.com/apex-legends-settings-performance/"
+    }
+  ],
+  "settings": [
+    {
+      "key": "gi",
+      "label": "Iluminación global / trazado de rayos",
+      "visual": 2,
+      "why": "Lo más caro en juegos modernos.",
+      "levels": [
+        [
+          "0",
+          "Desactivado o bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          8
+        ],
+        [
+          "2",
+          "Alto",
+          16
+        ],
+        [
+          "3",
+          "Ultra",
+          24
+        ]
+      ]
+    },
+    {
+      "key": "shadows",
+      "label": "Sombras",
+      "visual": 2,
+      "why": "Casi siempre entre los dos ajustes más caros.",
+      "levels": [
+        [
+          "0",
+          "Bajas",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Medias",
+          5,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "2",
+          "Altas",
+          10,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "3",
+          "Ultra",
+          15,
+          {
+            "cpu": 4
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ao",
+      "label": "Oclusión ambiental",
+      "visual": 1,
+      "why": "Puede costar hasta un 15 % y se nota poco en movimiento (PC Gamer, en Apex).",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Media",
+          6
+        ],
+        [
+          "2",
+          "Alta",
+          12
+        ]
+      ]
+    },
+    {
+      "key": "volumetrics",
+      "label": "Niebla y luz volumétrica",
+      "visual": 1,
+      "why": "Coste medio-alto y a veces empeora la visibilidad.",
+      "levels": [
+        [
+          "0",
+          "Desactivada o baja",
+          0
+        ],
+        [
+          "1",
+          "Media",
+          3
+        ],
+        [
+          "2",
+          "Alta",
+          6
+        ],
+        [
+          "3",
+          "Ultra",
+          9
+        ]
+      ]
+    },
+    {
+      "key": "reflections",
+      "label": "Reflejos",
+      "visual": 1,
+      "why": "Coste medio.",
+      "levels": [
+        [
+          "0",
+          "Bajos",
+          0
+        ],
+        [
+          "1",
+          "Medios",
+          3
+        ],
+        [
+          "2",
+          "Altos",
+          6
+        ],
+        [
+          "3",
+          "Ultra",
+          8
+        ]
+      ]
+    },
+    {
+      "key": "effects",
+      "label": "Efectos y partículas",
+      "visual": 2,
+      "why": "Pesan en los momentos de más acción.",
+      "levels": [
+        [
+          "0",
+          "Bajos",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Medios",
+          2,
+          {
+            "cpu": 1
+          }
+        ],
+        [
+          "2",
+          "Altos",
+          4,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "3",
+          "Ultra",
+          6,
+          {
+            "cpu": 3
+          }
+        ]
+      ]
+    },
+    {
+      "key": "post",
+      "label": "Postprocesado",
+      "visual": 1,
+      "why": "Coste bajo; en bajo la imagen suele verse más limpia.",
+      "levels": [
+        [
+          "0",
+          "Bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          2
+        ],
+        [
+          "2",
+          "Alto",
+          4
+        ],
+        [
+          "3",
+          "Ultra",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "view",
+      "label": "Distancia de visión",
+      "visual": 2,
+      "why": "Más objetos que dibujar a lo lejos: carga sobre todo el procesador.",
+      "levels": [
+        [
+          "0",
+          "Baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "1",
+          "Media",
+          2,
+          {
+            "cpu": 3
+          }
+        ],
+        [
+          "2",
+          "Alta",
+          3,
+          {
+            "cpu": 6
+          }
+        ],
+        [
+          "3",
+          "Ultra",
+          5,
+          {
+            "cpu": 9
+          }
+        ]
+      ]
+    },
+    {
+      "key": "aa",
+      "label": "Antialiasing",
+      "visual": 2,
+      "why": "Coste bajo y mejora mucho la imagen.",
+      "levels": [
+        [
+          "0",
+          "Bajo",
+          0
+        ],
+        [
+          "1",
+          "Medio",
+          2
+        ],
+        [
+          "2",
+          "Alto",
+          3
+        ],
+        [
+          "3",
+          "Ultra",
+          4
+        ]
+      ]
+    },
+    {
+      "key": "textures",
+      "label": "Texturas",
+      "why": "No cuestan FPS mientras quepan en la memoria de tu gráfica.",
+      "levels": [
+        [
+          "0",
+          "Bajas",
+          0,
+          {
+            "vram": 0
+          }
+        ],
+        [
+          "1",
+          "Medias",
+          0,
+          {
+            "vram": 3
+          }
+        ],
+        [
+          "2",
+          "Altas",
+          0,
+          {
+            "vram": 5
+          }
+        ],
+        [
+          "3",
+          "Ultra",
+          0,
+          {
+            "vram": 8
+          }
+        ]
+      ]
+    },
+    {
+      "key": "motionblur",
+      "label": "Desenfoque de movimiento",
+      "why": "Emborrona la imagen; casi todo el mundo lo prefiere apagado.",
+      "levels": [
+        [
+          "0",
+          "Desactivado"
+        ],
+        [
+          "1",
+          "Activado"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    },
+    {
+      "key": "vsync",
+      "label": "Sincronización vertical",
+      "why": "Añade retraso de entrada; mejor limitar los FPS a la frecuencia de tu pantalla.",
+      "levels": [
+        [
+          "0",
+          "Desactivada"
+        ],
+        [
+          "1",
+          "Activada"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "profiles": [
+    {
+      "id": "lol",
+      "file": "lol.json",
+      "version": 4
+    },
+    {
+      "id": "apex",
+      "file": "apex.json",
+      "version": 4
+    },
+    {
+      "id": "deadlock",
+      "file": "deadlock.json",
+      "version": 4
+    },
+    {
+      "id": "warframe",
+      "file": "warframe.json",
+      "version": 4
+    },
+    {
+      "id": "dyinglight",
+      "file": "dyinglight.json",
+      "version": 4
+    },
+    {
+      "id": "re6",
+      "file": "re6.json",
+      "version": 3
+    },
+    {
+      "id": "unreal",
+      "file": "engines/unreal.json",
+      "version": 3
+    },
+    {
+      "id": "generic",
+      "file": "engines/generic.json",
+      "version": 3
+    }
+  ]
+}

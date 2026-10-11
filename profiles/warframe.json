@@ -1,0 +1,188 @@
+{
+  "id": "warframe",
+  "version": 4,
+  "name": "Warframe",
+  "games": [
+    "steam-230410",
+    "epic-Warframe"
+  ],
+  "config": {
+    "path": "{localappdata}/Warframe/EE.cfg",
+    "format": "flat"
+  },
+  "processes": [
+    "Warframe.x64.exe"
+  ],
+  "demandGpu": "GTX 1050 Ti",
+  "note": "Las partículas son la causa principal de bajones con muchos enemigos. En sombras, de Alto a Medio se ahorra bastante, pero de Medio a Bajo casi no se gana y se ve mucho peor.",
+  "sources": [
+    {
+      "name": "PC Optimized Settings",
+      "url": "https://pcoptimizedsettings.com/best-warframe-1999-settings-pc-with-benchmarks-optimized-for-240-fps/"
+    },
+    {
+      "name": "CheckFPS",
+      "url": "https://checkfps.io/en/optimize-fps/warframe"
+    },
+    {
+      "name": "DTG Reviews",
+      "url": "https://www.dtgre.com/2024/12/best-graphics-settings-for-warframe.html"
+    },
+    {
+      "name": "Warframe Wiki",
+      "url": "https://wiki.warframe.com/w/Settings/Display"
+    }
+  ],
+  "settings": [
+    {
+      "key": "Graphics.ParticleSysQuality",
+      "label": "Calidad de partículas",
+      "visual": 2,
+      "why": "La causa principal de bajones con muchos enemigos en pantalla, en torno a un 12 % (CheckFPS).",
+      "levels": [
+        [
+          "PQ_LOW",
+          "Baja",
+          0,
+          {
+            "cpu": 0
+          }
+        ],
+        [
+          "PQ_MEDIUM",
+          "Media",
+          6,
+          {
+            "cpu": 2
+          }
+        ],
+        [
+          "PQ_HIGH",
+          "Alta",
+          12,
+          {
+            "cpu": 4
+          }
+        ]
+      ]
+    },
+    {
+      "key": "Graphics.ShadowQuality",
+      "label": "Sombras",
+      "visual": 2,
+      "why": "Alto cuesta bastante para lo poco que se nota; de Medio a Bajo casi no se gana (PC Optimized Settings, DTG Reviews).",
+      "levels": [
+        [
+          "SQ_LOW",
+          "Bajas",
+          0
+        ],
+        [
+          "SQ_MEDIUM",
+          "Medias",
+          2,
+          {
+            "visual": 4
+          }
+        ],
+        [
+          "SQ_HIGH",
+          "Altas",
+          8
+        ]
+      ]
+    },
+    {
+      "key": "Graphics.EnableVolumetricLighting",
+      "label": "Iluminación volumétrica",
+      "visual": 1,
+      "why": "Rayos de luz vistosos pero caros; lo primero que recortan las guías.",
+      "levels": [
+        [
+          "0",
+          "Desactivada",
+          0
+        ],
+        [
+          "1",
+          "Activada",
+          6
+        ]
+      ]
+    },
+    {
+      "key": "Graphics.EnableContactShadows",
+      "label": "Sombras de contacto",
+      "visual": 1,
+      "why": "Pequeño detalle visual con un coste apreciable en gráficas de entrada.",
+      "levels": [
+        [
+          "0",
+          "Desactivadas",
+          0
+        ],
+        [
+          "1",
+          "Activadas",
+          3
+        ]
+      ]
+    },
+    {
+      "key": "Graphics.UpscaleQuality",
+      "label": "Calidad de DLSS",
+      "visual": 2,
+      "requires": "nvidia",
+      "why": "Renderiza a menos resolución y la reconstruye: mucho más FPS con poca pérdida visual.",
+      "levels": [
+        [
+          "UQ_PERFORMANCE",
+          "Rendimiento",
+          0
+        ],
+        [
+          "UQ_BALANCED",
+          "Equilibrado",
+          10
+        ],
+        [
+          "UQ_QUALITY",
+          "Calidad",
+          20
+        ]
+      ]
+    },
+    {
+      "key": "Graphics.EnableMotionBlur",
+      "label": "Desenfoque de movimiento",
+      "why": "Emborrona la imagen al moverte rápido.",
+      "levels": [
+        [
+          "0",
+          "Desactivado"
+        ],
+        [
+          "1",
+          "Activado"
+        ]
+      ],
+      "fixed": {
+        "fps": "0",
+        "equilibrado": "0",
+        "calidad": "0"
+      }
+    },
+    {
+      "key": "Graphics.MaxFrameRate",
+      "label": "Límite de FPS",
+      "why": "Igual a la frecuencia de tu pantalla: tiempos de fotograma más estables.",
+      "fixed": {
+        "fps": "{refresh}",
+        "equilibrado": "{refresh}",
+        "calidad": "{refresh}"
+      }
+    }
+  ],
+  "demandCpu": "Intel Core i5-4670 / AMD Ryzen 3 1200",
+  "demandRamGb": 8
+}
