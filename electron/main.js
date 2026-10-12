@@ -8,6 +8,7 @@ import * as optimize from "./optimize.js";
 import * as overlay from "./overlay.js";
 import * as gamemode from "./gamemode.js";
 import * as network from "./network.js";
+import * as cleanup from "./cleanup.js";
 import updater from "electron-updater";
 
 const { autoUpdater } = updater;
@@ -94,6 +95,19 @@ async function listGames() {
   return withStatus;
 }
 
+// Si algún juego se actualizó, se borra la basura que dejó la versión anterior (o se avisa, si la limpieza automática está apagada).
+async function checkUpdatedGames(games) {
+  await cleanup.detectUpdates(games);
+  const results = await cleanup.processUpdated(games);
+  if (!results.length) return;
+  const cleaned = results.filter((r) => r.freed > 0);
+  if (cleaned.length) {
+    const total = cleaned.reduce((n, r) => n + r.freed, 0);
+    tray?.displayBalloon({ title: "Espacio liberado tras actualizar", content: `${cleaned.map((r) => r.name).join(", ")}: ${(total / 1024 ** 3).toFixed(1)} GB de archivos sobrantes.` });
+  }
+  mainWindow?.webContents.send("games-cleaned", results);
+}
+
 const gameById = (id) => {
   const g = knownGames.find((x) => x.id === id);
   if (!g) throw new Error("Juego no encontrado.");
@@ -114,6 +128,7 @@ async function watchGames() {
       if (!now) return;
       const added = now.filter((g) => !before.has(g.id)).map((g) => ({ name: g.name, status: g.status }));
       mainWindow?.webContents.send("games-changed", added);
+      await checkUpdatedGames(now).catch(() => {});
     }, 3000); // las tiendas escriben varias veces seguidas: se espera a que terminen
   };
   for (const d of await system.gameDirs()) {
@@ -129,6 +144,20 @@ const handlers = {
   scan: () => system.scan(),
   startup: () => system.startupApps(),
   games: () => listGames(),
+  // Basura de actualizaciones: primero se mide (no borra nada), luego se borra lo que el usuario confirmó.
+  "clean-scan": async (id) => {
+    const { items, blocked } = await cleanup.scan(gameById(id), { manual: true });
+    return { blocked, total: items.reduce((n, i) => n + i.bytes, 0), items: items.map((i) => ({ why: i.why, bytes: i.bytes })) };
+  },
+  // No se fía de rutas que mande la interfaz: se vuelve a calcular qué borrar.
+  "clean-run": async (id) => {
+    const g = gameById(id);
+    const { items, blocked } = await cleanup.scan(g, { manual: true });
+    if (blocked) throw new Error(blocked);
+    return cleanup.clean(g, items);
+  },
+  "clean-get": () => cleanup.getSettings(),
+  "clean-set": (patch) => cleanup.setSettings(patch),
   "game-detail": (id, goal) => optimize.detail(gameById(id), goal),
   "game-apply": async (id, goal) => {
     const msg = await optimize.apply(gameById(id), goal);
@@ -317,7 +346,10 @@ app.whenReady().then(() => {
   checkUpdates();
   optimize.updateProfiles().catch(() => {});
   createWindow();
-  listGames().then(watchGames).catch(() => {});
+  listGames().then(async (g) => {
+    await watchGames();
+    setTimeout(() => checkUpdatedGames(g).catch(() => {}), 10000); // con la ventana ya cargada, para que le llegue el aviso
+  }).catch(() => {});
   // Drivers: se comprueban en internet en segundo plano al abrir la app (y cada 6 h si sigue abierta),
   // así la pestaña y el análisis ya tienen el resultado. Se espera un poco para no frenar el arranque.
   const checkDrivers = () => system.drivers({ online: true }).catch(() => {});

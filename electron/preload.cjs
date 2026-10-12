@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld("afina", {
   startup: call("startup"),
   games: call("games"),
   gameDetail: call("game-detail"),
+  cleanScan: call("clean-scan"),
+  cleanRun: call("clean-run"),
+  cleanGet: call("clean-get"),
+  cleanSet: call("clean-set"),
   applyGame: call("game-apply"),
   restoreGame: call("game-restore"),
   copyReport: call("copy-report"),
@@ -33,5 +37,6 @@ contextBridge.exposeInMainWorld("afina", {
   updateInstall: call("update-install"),
   onUpdateReady: (cb) => ipcRenderer.on("update-ready", (_e, v) => cb(v)),
   openUpdate: call("open-update"),
+  onGamesCleaned: (cb) => ipcRenderer.on("games-cleaned", (_e, results) => cb(results)),
   onGamesChanged: (cb) => ipcRenderer.on("games-changed", (_e, added) => cb(added)),
 });

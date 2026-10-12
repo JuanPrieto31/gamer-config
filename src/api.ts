@@ -115,6 +115,12 @@ export interface ApplyResult { name: string; status: "ok" | "same" | "guia" | "s
 export interface ActionResult { msg: string; verified: boolean | null }
 export interface HistoryEntry { id: number; label: string; at: string; undo: unknown; undone: boolean }
 
+// Basura que dejan las actualizaciones de un juego. blocked = por qué no se puede limpiar ahora (juego abierto...).
+export interface CleanScan { blocked: string | null; total: number; items: { why: string; bytes: number }[] }
+export interface CleanResult { removed: number; freed: number }
+// Resultado de limpiar tras detectar una actualización: freed = 0 con available > 0 si la limpieza automática está apagada.
+export interface CleanedGame { id: string; name: string; freed: number; removed: number; available: number }
+
 interface Bridge {
   specs(): Promise<Specs>;
   usage(): Promise<Usage>;
@@ -122,6 +128,11 @@ interface Bridge {
   startup(): Promise<StartupApp[]>;
   games(): Promise<Game[]>;
   gameDetail(id: string, goal: Goal): Promise<GameDetail>;
+  cleanScan(id: string): Promise<CleanScan>;
+  cleanRun(id: string): Promise<CleanResult>;
+  cleanGet(): Promise<{ auto: boolean }>;
+  cleanSet(patch: { auto: boolean }): Promise<{ auto: boolean }>;
+  onGamesCleaned(cb: (results: CleanedGame[]) => void): void;
   applyGame(id: string, goal: Goal): Promise<string>;
   restoreGame(id: string): Promise<string>;
   copyReport(id: string, goal: Goal): Promise<boolean>;
@@ -264,6 +275,11 @@ const mock: Bridge = {
   async overlayToggle() { return true; },
   async overlayFps() { return "Listo. Cierra sesión en Windows una vez para que se active."; },
   onGamesChanged() {},
+  onGamesCleaned() {},
+  async cleanScan() { return { blocked: null, total: 6.4 * 1024 ** 3, items: [{ why: "Descarga de actualización a medias", bytes: 5.1 * 1024 ** 3 }, { why: "Archivos temporales de actualización", bytes: 1.3 * 1024 ** 3 }] }; },
+  async cleanRun() { return { removed: 2, freed: 6.4 * 1024 ** 3 }; },
+  async cleanGet() { return { auto: true }; },
+  async cleanSet(patch) { return { auto: patch.auto }; },
   async gamemodeGet() { return { settings: { ...mockGameMode }, active: null }; },
   async gamemodeSet(patch) { Object.assign(mockGameMode, patch); return { ...mockGameMode }; },
   async gamemodeApps() { return [{ exe: "discord.exe", title: "Discord" }, { exe: "msedge.exe", title: "Microsoft Edge" }, { exe: "spotify.exe", title: "Spotify" }]; },
