@@ -1,0 +1,33 @@
+{
+  "id": "marvelrivals",
+  "version": 1,
+  "name": "Marvel Rivals",
+  "games": ["steam-2767030"],
+  "names": ["Marvel Rivals"],
+  "config": { "path": "{localappdata}/Marvel/Saved/Config/Windows/GameUserSettings.ini", "format": "flat" },
+  "processes": ["Marvel-Win64-Shipping.exe", "Marvel.exe"],
+  "note": "Unreal Engine 5 con Lumen: la iluminación global es de lejos lo más caro. Bajarla a Media o Baja es lo que más FPS da.",
+  "sources": [
+    { "name": "Epic Games (escalabilidad de Unreal)", "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/scalability-reference-for-unreal-engine" }
+  ],
+  "settings": [
+    { "key": "sg.GlobalIlluminationQuality", "label": "Iluminación global", "visual": 2, "why": "Lumen: lo que más FPS cuesta en este juego.",
+      "levels": [["0", "Baja", 0], ["1", "Media", 12], ["2", "Alta", 25], ["3", "Ultra", 40]] },
+    { "key": "sg.ShadowQuality", "label": "Sombras", "visual": 2,
+      "levels": [["0", "Bajas", 0], ["1", "Medias", 8, { "cpu": 2 }], ["2", "Altas", 16, { "cpu": 4 }], ["3", "Ultra", 26, { "cpu": 6 }]] },
+    { "key": "sg.ReflectionQuality", "label": "Reflejos", "visual": 1,
+      "levels": [["0", "Bajos", 0], ["1", "Medios", 5], ["2", "Altos", 10], ["3", "Ultra", 16]] },
+    { "key": "sg.EffectsQuality", "label": "Efectos", "visual": 1, "why": "Habilidades de los héroes: se notan en peleas de 12 jugadores.",
+      "levels": [["0", "Bajos", 0], ["1", "Medios", 4], ["2", "Altos", 8], ["3", "Ultra", 12]] },
+    { "key": "sg.PostProcessQuality", "label": "Postprocesado", "visual": 1,
+      "levels": [["0", "Bajo", 0], ["1", "Medio", 3], ["2", "Alto", 6], ["3", "Ultra", 9]] },
+    { "key": "sg.ViewDistanceQuality", "label": "Distancia de visión", "visual": 1,
+      "levels": [["0", "Cerca", 0, { "cpu": 0 }], ["1", "Media", 3, { "cpu": 4 }], ["2", "Lejos", 6, { "cpu": 8 }], ["3", "Ultra", 9, { "cpu": 12 }]] },
+    { "key": "sg.FoliageQuality", "label": "Vegetación", "visual": 1,
+      "levels": [["0", "Baja", 0], ["1", "Media", 2], ["2", "Alta", 4], ["3", "Ultra", 6]] },
+    { "key": "sg.AntiAliasingQuality", "label": "Antialiasing", "visual": 1,
+      "levels": [["0", "Bajo", 0], ["1", "Medio", 2], ["2", "Alto", 4], ["3", "Ultra", 6]] },
+    { "key": "sg.TextureQuality", "label": "Texturas", "why": "No cuesta FPS mientras quepa en la memoria de la gráfica.",
+      "levels": [["0", "Bajas", 0, { "vram": 2 }], ["1", "Medias", 0, { "vram": 3 }], ["2", "Altas", 0, { "vram": 5 }], ["3", "Ultra", 0, { "vram": 7 }]] }
+  ]
+}

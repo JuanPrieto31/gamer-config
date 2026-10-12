@@ -1,0 +1,27 @@
+{
+  "id": "minecraft",
+  "version": 1,
+  "name": "Minecraft: Java Edition",
+  "games": [],
+  "names": ["Minecraft", "Minecraft Launcher", "Minecraft: Java Edition", "Minecraft Java Edition"],
+  "config": { "path": "{appdata}/.minecraft/options.txt", "format": "colon" },
+  "processes": ["javaw.exe"],
+  "note": "La distancia de renderizado es lo que más pesa, sobre todo en el procesador: cada paso multiplica los chunks que hay que cargar. El modo Fabuloso cuesta bastante en gráficas modestas.",
+  "sources": [
+    { "name": "Minecraft Wiki (opciones de vídeo)", "url": "https://minecraft.wiki/w/Options#Video_settings" }
+  ],
+  "settings": [
+    { "key": "renderDistance", "label": "Distancia de renderizado", "visual": 2, "why": "Lo que más FPS cuesta, en gráfica y sobre todo en procesador.",
+      "levels": [["6", "6 chunks", 0, { "cpu": 0 }], ["8", "8 chunks", 10, { "cpu": 8 }], ["12", "12 chunks", 25, { "cpu": 20 }], ["16", "16 chunks", 45, { "cpu": 35 }], ["24", "24 chunks", 80, { "cpu": 60 }], ["32", "32 chunks", 120, { "cpu": 90 }]] },
+    { "key": "simulationDistance", "label": "Distancia de simulación", "visual": 1, "why": "Hasta dónde se mueven animales, cultivos y máquinas: solo carga el procesador.",
+      "levels": [["5", "5 chunks", 0, { "cpu": 0 }], ["8", "8 chunks", 0, { "cpu": 10 }], ["12", "12 chunks", 0, { "cpu": 20 }]] },
+    { "key": "graphicsMode", "label": "Calidad gráfica", "visual": 1,
+      "levels": [["0", "Rápida", 0], ["1", "Detallada", 10], ["2", "Fabulosa", 25]] },
+    { "key": "particles", "label": "Partículas", "visual": 1,
+      "levels": [["2", "Mínimas", 0], ["1", "Reducidas", 3], ["0", "Todas", 6]] },
+    { "key": "entityShadows", "label": "Sombras de entidades", "visual": 1,
+      "levels": [["false", "Desactivadas", 0], ["true", "Activadas", 3]] },
+    { "key": "ao", "label": "Iluminación suave", "visual": 1,
+      "levels": [["false", "Desactivada", 0], ["true", "Activada", 3]] }
+  ]
+}

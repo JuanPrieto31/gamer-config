@@ -1,0 +1,33 @@
+{
+  "id": "gtav",
+  "version": 1,
+  "name": "Grand Theft Auto V",
+  "games": ["steam-271590"],
+  "names": ["Grand Theft Auto V", "GTA V", "Grand Theft Auto V Legacy"],
+  "config": { "path": "{docs}/Rockstar Games/GTA V/settings.xml", "format": "xml" },
+  "processes": ["GTA5.exe", "PlayGTAV.exe"],
+  "note": "El MSAA y la hierba son lo que más cuesta: la hierba en Ultra puede quitar un tercio de los FPS en zonas de campo y también carga el procesador.",
+  "sources": [
+    { "name": "NVIDIA (guía de ajustes de GTA V)", "url": "https://www.nvidia.com/en-us/geforce/news/grand-theft-auto-v-pc-graphics-and-performance-guide/" }
+  ],
+  "settings": [
+    { "key": "MSAA", "label": "Antialiasing (MSAA)", "visual": 2, "why": "Lo más caro; FXAA da un resultado parecido casi gratis.",
+      "levels": [["0", "Desactivado", 0], ["2", "2x", 12], ["4", "4x", 25], ["8", "8x", 45]] },
+    { "key": "GrassQuality", "label": "Hierba", "visual": 1, "why": "En Ultra hunde los FPS en el campo (NVIDIA).",
+      "levels": [["0", "Normal", 0, { "cpu": 0 }], ["1", "Alta", 6, { "cpu": 3 }], ["2", "Muy alta", 14, { "cpu": 8 }], ["3", "Ultra", 28, { "cpu": 15 }]] },
+    { "key": "ShadowQuality", "label": "Sombras", "visual": 2,
+      "levels": [["1", "Normales", 0], ["2", "Altas", 8], ["3", "Muy altas", 16]] },
+    { "key": "ReflectionQuality", "label": "Reflejos", "visual": 1,
+      "levels": [["0", "Normales", 0], ["1", "Altos", 4], ["2", "Muy altos", 8], ["3", "Ultra", 14]] },
+    { "key": "PostFX", "label": "Postprocesado", "visual": 1,
+      "levels": [["0", "Normal", 0], ["1", "Alto", 4], ["2", "Muy alto", 8], ["3", "Ultra", 12]] },
+    { "key": "SSAO", "label": "Oclusión ambiental", "visual": 1,
+      "levels": [["0", "Desactivada", 0], ["1", "Normal", 4], ["2", "Alta", 8]] },
+    { "key": "Tessellation", "label": "Teselación", "visual": 1,
+      "levels": [["0", "Desactivada", 0], ["1", "Normal", 2], ["2", "Alta", 4], ["3", "Muy alta", 6]] },
+    { "key": "ParticleQuality", "label": "Partículas", "visual": 1,
+      "levels": [["0", "Normales", 0], ["1", "Altas", 3], ["2", "Muy altas", 6]] },
+    { "key": "TextureQuality", "label": "Texturas", "why": "No cuesta FPS mientras quepa en la memoria de la gráfica.",
+      "levels": [["0", "Normales", 0, { "vram": 1 }], ["1", "Altas", 0, { "vram": 2 }], ["2", "Muy altas", 0, { "vram": 3.5 }]] }
+  ]
+}

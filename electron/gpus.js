@@ -5,21 +5,23 @@
 // El orden importa: las variantes (Ti, Super, XT...) van antes que el modelo base.
 
 const GPUS = [
-  // NVIDIA RTX 50
-  [/rtx\s*5090/, 400, 300], [/rtx\s*5080/, 300, 230], [/rtx\s*5070\s*ti/, 265, 190], [/rtx\s*5070/, 215, 150],
-  [/rtx\s*5060\s*ti/, 165], [/rtx\s*5060/, 140, 110], [/rtx\s*5050/, 110, 90],
+  // NVIDIA RTX 50 (las de portátil rinden bastante menos que las de sobremesa del mismo nombre)
+  [/rtx\s*5090/, 400, 220], [/rtx\s*5080/, 300, 190], [/rtx\s*5070\s*ti/, 265, 150], [/rtx\s*5070/, 215, 120],
+  [/rtx\s*5060\s*ti/, 165], [/rtx\s*5060/, 140, 105], [/rtx\s*5050/, 110, 85],
   // NVIDIA RTX 40
   [/rtx\s*4090/, 340, 210], [/rtx\s*4080\s*super/, 280], [/rtx\s*4080/, 270, 180], [/rtx\s*4070\s*ti\s*super/, 235],
   [/rtx\s*4070\s*ti/, 220], [/rtx\s*4070\s*super/, 200], [/rtx\s*4070/, 175, 115], [/rtx\s*4060\s*ti/, 135],
   [/rtx\s*4060/, 115, 100], [/rtx\s*4050/, 90, 85],
   // NVIDIA RTX 30
   [/rtx\s*3090\s*ti/, 210], [/rtx\s*3090/, 195], [/rtx\s*3080\s*ti/, 190, 135], [/rtx\s*3080/, 175, 120],
-  [/rtx\s*3070\s*ti/, 150, 115], [/rtx\s*3070/, 140, 105], [/rtx\s*3060\s*ti/, 125], [/rtx\s*3060/, 100, 85],
+  [/rtx\s*3070\s*ti/, 150, 115], [/rtx\s*3070/, 140, 105], [/rtx\s*3060\s*ti/, 125],
+  // Mismo nombre, distinta memoria: la RTX 3060 de 8 GB (2022) rinde ~15 % menos que la de 12 GB.
+  [/rtx\s*3060/, 85, 75, 8], [/rtx\s*3060/, 100, 85],
   // La RTX 3050 de sobremesa de 6 GB (2024) es bastante más lenta que la de 8 GB.
   [/rtx\s*3050\s*ti/, 75, 60], [/rtx\s*3050\s*6\s*gb(?!.*(laptop|mobile|max-q))/, 58], [/rtx\s*3050/, 70, 55],
   // NVIDIA RTX 20 / GTX 16
   [/rtx\s*2080\s*ti/, 150], [/rtx\s*2080\s*super/, 130, 105], [/rtx\s*2080/, 125, 100], [/rtx\s*2070\s*super/, 115, 90],
-  [/rtx\s*2070/, 100, 85], [/rtx\s*2060\s*super/, 95], [/rtx\s*2060/, 85, 70],
+  [/rtx\s*2070/, 100, 85], [/rtx\s*2060\s*super/, 95], [/rtx\s*2060/, 85, 70], [/rtx\s*2050/, 40, 40],
   [/gtx\s*1660\s*ti/, 68, 58], [/gtx\s*1660\s*super/, 66], [/gtx\s*1660/, 60], [/gtx\s*1650\s*ti/, 45, 42],
   [/gtx\s*1650\s*super/, 55], [/gtx\s*1650/, 42, 37], [/gtx\s*1630/, 25],
   // NVIDIA GTX 10
@@ -37,43 +39,62 @@ const GPUS = [
   [/mx\s*570/, 22], [/mx\s*550/, 18], [/mx\s*450/, 16], [/mx\s*350/, 11], [/mx\s*330/, 11], [/mx\s*250/, 10], [/mx\s*230/, 8], [/mx\s*150/, 9], [/mx\s*1[13]0/, 6],
 
   // AMD RX 9000 / 7000 / 6000
-  [/rx\s*9070\s*xt/, 280], [/rx\s*9070/, 250], [/rx\s*9060\s*xt/, 150], [/rx\s*9060/, 130],
-  [/rx\s*7900\s*xtx/, 300], [/rx\s*7900\s*xt/, 260], [/rx\s*7900\s*gre/, 225], [/rx\s*7800\s*xt/, 200], [/rx\s*7700\s*xt/, 170],
-  [/rx\s*7600m\s*xt/, 105], [/rx\s*7600s/, 95], [/rx\s*7600\s*xt/, 120], [/rx\s*7600/, 115],
-  [/rx\s*6950\s*xt/, 235], [/rx\s*6900\s*xt/, 225], [/rx\s*6850m/, 150], [/rx\s*6800m/, 140], [/rx\s*6800\s*xt/, 210], [/rx\s*6800/, 185],
-  [/rx\s*6750\s*xt/, 150], [/rx\s*6700m/, 110], [/rx\s*6700\s*xt/, 140], [/rx\s*6700/, 125], [/rx\s*6650\s*xt/, 115],
-  [/rx\s*6600m/, 95], [/rx\s*6600\s*xt/, 110], [/rx\s*6600/, 95], [/rx\s*6500m/, 45], [/rx\s*6500\s*xt/, 50], [/rx\s*6400/, 38],
+  [/rx\s*9070\s*xt/, 280], [/rx\s*9070\s*gre/, 210], [/rx\s*9070/, 250], [/rx\s*9060\s*xt/, 150], [/rx\s*9060/, 130],
+  [/rx\s*7900\s*xtx/, 300], [/rx\s*7900\s*xt/, 260], [/rx\s*7900\s*gre/, 225], [/rx\s*7800\s*xt/, 200], [/rx\s*7700\s*xt/, 170], [/rx\s*7700s/, 120], [/rx\s*7700/, 150],
+  [/rx\s*7650\s*gre/, 125], [/rx\s*7600m\s*xt/, 105], [/rx\s*7600m/, 95], [/rx\s*7600s/, 95], [/rx\s*7600\s*xt/, 120], [/rx\s*7600/, 115],
+  [/rx\s*6950\s*xt/, 235], [/rx\s*6900\s*xt/, 225], [/rx\s*6850m/, 150], [/rx\s*6800m/, 140], [/rx\s*6800s/, 110], [/rx\s*6800\s*xt/, 210], [/rx\s*6800/, 185],
+  [/rx\s*6750\s*xt/, 150], [/rx\s*6700m/, 110], [/rx\s*6700s/, 95], [/rx\s*6700\s*xt/, 140], [/rx\s*6700/, 125], [/rx\s*6650\s*xt/, 115], [/rx\s*6650m/, 100],
+  [/rx\s*6600m/, 95], [/rx\s*6600s/, 80], [/rx\s*6600\s*xt/, 110], [/rx\s*6600/, 95], [/rx\s*6550m/, 50], [/rx\s*6500m/, 45], [/rx\s*6500\s*xt/, 50], [/rx\s*6400/, 38],
   // AMD RX 5000 / Vega / 500 / 400
   [/rx\s*5700\s*xt/, 105], [/rx\s*5700/, 95], [/rx\s*5600m/, 60], [/rx\s*5600\s*xt/, 85], [/rx\s*5600/, 75], [/rx\s*5500m/, 45], [/rx\s*5500/, 55],
   [/radeon\s*vii/, 95], [/vega\s*64/, 80], [/vega\s*56/, 72],
-  [/rx\s*590/, 58], [/rx\s*580/, 53], [/rx\s*570/, 46], [/rx\s*560/, 25], [/rx\s*550/, 15], [/rx\s*480/, 50], [/rx\s*470/, 44], [/rx\s*460/, 22],
+  [/rx\s*5300m/, 35], [/rx\s*590/, 58], [/rx\s*580/, 53], [/rx\s*570/, 46], [/rx\s*560/, 25], [/rx\s*550/, 15], [/rx\s*480/, 50], [/rx\s*470/, 44], [/rx\s*460/, 22],
+  [/rx\s*640/, 11], [/rx\s*6[23]0/, 9], [/rx\s*540/, 8], [/r[57]\s*m\d{3}/, 6], // gráficas AMD de portátil de entrada (2017-2020)
   // AMD R9 / R7 / HD
   [/r9\s*fury\s*x/, 65], [/r9\s*(nano|fury)/, 60], [/r9\s*390x/, 52], [/r9\s*390/, 50], [/r9\s*290x/, 47], [/r9\s*290/, 44],
   [/r9\s*380x/, 36], [/r9\s*380/, 33], [/r9\s*285/, 30], [/r9\s*280x/, 32], [/r9\s*280/, 30], [/r9\s*270x/, 25], [/r9\s*270/, 23],
   [/r7\s*370/, 20], [/r7\s*265/, 20], [/r7\s*260x?/, 15], [/r7\s*250/, 9],
   [/hd\s*7970/, 32], [/hd\s*7950/, 27], [/hd\s*7870/, 22], [/hd\s*7850/, 18], [/hd\s*7790/, 15], [/hd\s*7770/, 11], [/hd\s*7750/, 8],
   [/hd\s*6970/, 17], [/hd\s*6950/, 16], [/hd\s*6870/, 14], [/hd\s*6850/, 12], [/hd\s*5870/, 13], [/hd\s*5850/, 11], [/hd\s*4870/, 6],
-  // AMD integradas
-  [/radeon\s*890m/, 32], [/radeon\s*880m/, 28], [/radeon\s*780m/, 27], [/radeon\s*760m/, 22], [/radeon\s*740m/, 15],
-  [/radeon\s*680m/, 22], [/radeon\s*660m/, 15], [/radeon\s*610m/, 6], [/vega\s*11/, 10], [/vega\s*(8|10)/, 9], [/vega\s*[367]/, 7],
+  // AMD integradas (las 8060S/8050S de los Ryzen AI Max rinden como una gráfica dedicada media)
+  [/radeon\s*8060s/, 95], [/radeon\s*8050s/, 75], [/radeon\s*890m/, 45], [/radeon\s*880m/, 40], [/radeon\s*780m/, 38], [/radeon\s*760m/, 30], [/radeon\s*740m/, 20],
+  [/radeon\s*680m/, 30], [/radeon\s*660m/, 20], [/radeon\s*610m/, 6], [/vega\s*11/, 10], [/vega\s*(8|10)/, 9], [/vega\s*[367]/, 7],
 
   // Intel
   [/arc\s*b580/, 120], [/arc\s*b570/, 105], [/arc\s*a770/, 110], [/arc\s*a750/, 100], [/arc\s*a580/, 85], [/arc\s*a380/, 40], [/arc\s*a310/, 25],
-  [/arc\s*a7\d0m/, 70], [/arc\s*a5\d0m/, 50], [/arc\s*a3\d0m/, 25], [/arc\s*140[tv]/, 28], [/arc\s*130[tv]/, 22],
-  [/intel.*arc\s*graphics/, 22], [/iris\s*xe/, 11], [/iris\s*plus/, 7], [/iris\s*pro/, 6], [/iris/, 5],
+  [/arc\s*a7\d0m/, 70], [/arc\s*a5\d0m/, 50], [/arc\s*a3\d0m/, 25], [/arc\s*140[tv]/, 40], [/arc\s*130[tv]/, 32],
+  [/intel.*arc\s*graphics/, 34], [/iris\s*xe/, 13], [/iris\s*plus/, 7], [/iris\s*pro/, 6], [/iris/, 5],
   [/uhd\s*(graphics\s*)?7[0-9]0/, 6], [/uhd\s*(graphics\s*)?6[0-9]0/, 5], [/uhd/, 4], [/hd\s*graphics\s*6[0-9]0/, 4], [/hd\s*graphics\s*5[0-9]0/, 4],
   [/hd\s*graphics\s*4000/, 2], [/hd\s*graphics\s*4[0-9]00/, 3], [/hd\s*graphics\s*[23]000/, 1],
-].map(([re, d, l]) => ({ re: new RegExp(re.source, "g"), d, l }));
+  // maxVram (4.º valor): esa fila solo vale para las versiones con esa memoria o menos (p. ej. RTX 3060 de 8 GB).
+].map(([re, d, l, maxVram]) => ({ re: new RegExp(re.source, "g"), d, l, maxVram }));
 
 const clean = (s) => String(s).toLowerCase().replace(/\((r|tm|c)\)|[®™]/g, "").replace(/[()]/g, " ").replace(/\s+/g, " ");
 const isLaptop = (s) => /laptop|mobile|max-q|notebook/.test(s);
 
+// Integradas (comparten la RAM): no tienen versión de portátil distinta ni límite de potencia propio.
+export const isIntegrated = (name) => /intel.*(uhd|hd\s*graphics|iris|arc\s*(1[34]0[tv]|graphics))|radeon\s*(\d{3}m|80[56]0s|graphics|vega)|vega\s*\d+\b/i.test(clean(name));
+// Modelos que solo existen en portátil (RX 7700S, RX 6600M, MX 450, RTX 2050): su cifra ya es la de portátil.
+const mobileOnly = (n) => /rx\s*\d{4}\s*(m|s)\b|mx\s*\d{3}|rtx\s*2050|\b\d{3,4}m\b/.test(n);
+
+// Potencia (W) típica con la que se mide cada gama de portátil en la tabla; la tuya puede ser mayor o menor.
+const refWatts = (laptopScore) => (laptopScore < 45 ? 50 : laptopScore < 65 ? 75 : laptopScore < 95 ? 90 : laptopScore < 130 ? 115 : 150);
+
 // Puntuación de una gráfica concreta (la del usuario). vramGb sirve de respaldo si no está en la tabla.
-export function scoreOf(name, vramGb = null) {
+// opts.laptop: el PC es portátil (Windows no siempre pone "Laptop" en el nombre: "GeForce GTX 1650" en portátil).
+// opts.watts: potencia máxima de la gráfica (nvidia-smi). La misma RTX 4060 Laptop rinde muy distinto a 45 W que a 140 W.
+export function scoreOf(name, vramGb = null, opts = {}) {
   const n = clean(name);
+  const laptop = isLaptop(n) || (opts.laptop && !isIntegrated(name));
   for (const g of GPUS) {
     g.re.lastIndex = 0;
-    if (g.re.test(n)) return isLaptop(n) ? (g.l ?? Math.round(g.d * 0.8)) : g.d;
+    if (!g.re.test(n)) continue;
+    if (g.maxVram && !(vramGb && vramGb <= g.maxVram)) continue; // variante de otra memoria
+    if (!laptop) return g.d;
+    const l = g.l ?? (mobileOnly(n) ? g.d : Math.round(g.d * 0.8));
+    // ponytail: corrección por potencia con una curva suave (raíz ~0,45); si no hay dato, la cifra típica.
+    const w = opts.watts > 0 ? Math.min(Math.max((opts.watts / refWatts(l)) ** 0.45, 0.7), 1.12) : 1;
+    return Math.round(l * w);
   }
   // Desconocida: integrada → muy baja; dedicada → estimación por su memoria.
   if (!vramGb || /intel|graphics$|radeon\s*graphics/.test(n)) return 8;
@@ -87,6 +108,7 @@ export function findAll(text) {
   const used = [];
   const found = [];
   for (const g of GPUS) {
+    if (g.maxVram) continue; // en los requisitos "RTX 3060" es la versión normal, no la de menos memoria
     g.re.lastIndex = 0;
     for (const m of n.matchAll(g.re)) {
       const [a, b] = [m.index, m.index + m[0].length];

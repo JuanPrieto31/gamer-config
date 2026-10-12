@@ -1,0 +1,36 @@
+{
+  "id": "fortnite",
+  "version": 1,
+  "name": "Fortnite",
+  "games": ["epic-Fortnite"],
+  "names": ["Fortnite"],
+  "config": { "path": "{localappdata}/FortniteGame/Saved/Config/WindowsClient/GameUserSettings.ini", "format": "flat" },
+  "processes": ["FortniteClient-Win64-Shipping.exe", "FortniteLauncher.exe"],
+  "demandGpu": "GTX 960 / R9 280",
+  "demandCpu": "Intel Core i5-7300U",
+  "note": "Unreal Engine 5. Con DirectX 12, la iluminación global (Lumen) y las sombras son lo más caro; la distancia de visión carga sobre todo el procesador en partidas con mucha construcción.",
+  "sources": [
+    { "name": "Epic Games (escalabilidad de Unreal)", "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/scalability-reference-for-unreal-engine" },
+    { "name": "Epic Games (Fortnite: ajustes)", "url": "https://www.fortnite.com/news/drop-into-the-next-generation-of-fortnite-battle-royale-powered-by-unreal-engine-5-1" }
+  ],
+  "settings": [
+    { "key": "sg.ShadowQuality", "label": "Sombras", "visual": 2, "why": "De lo más caro; en Bajo apenas cambia la visibilidad en partida.",
+      "levels": [["0", "Bajas", 0], ["1", "Medias", 10, { "cpu": 2 }], ["2", "Altas", 22, { "cpu": 4 }], ["3", "Épicas", 35, { "cpu": 6 }]] },
+    { "key": "sg.GlobalIlluminationQuality", "label": "Iluminación global", "visual": 2, "why": "Con Lumen (DirectX 12) es de lo que más FPS cuesta.",
+      "levels": [["0", "Baja", 0], ["1", "Media", 8], ["2", "Alta", 18], ["3", "Épica", 30]] },
+    { "key": "sg.ViewDistanceQuality", "label": "Distancia de visión", "visual": 2, "why": "Carga sobre todo el procesador.",
+      "levels": [["0", "Cerca", 0, { "cpu": 0 }], ["1", "Media", 4, { "cpu": 5 }], ["2", "Lejos", 8, { "cpu": 10 }], ["3", "Épica", 12, { "cpu": 15 }]] },
+    { "key": "sg.ReflectionQuality", "label": "Reflejos", "visual": 1,
+      "levels": [["0", "Bajos", 0], ["1", "Medios", 4], ["2", "Altos", 9], ["3", "Épicos", 14]] },
+    { "key": "sg.EffectsQuality", "label": "Efectos", "visual": 1, "why": "Explosiones y humo: se notan en peleas grandes.",
+      "levels": [["0", "Bajos", 0], ["1", "Medios", 3], ["2", "Altos", 6], ["3", "Épicos", 10]] },
+    { "key": "sg.PostProcessQuality", "label": "Postprocesado", "visual": 1,
+      "levels": [["0", "Bajo", 0], ["1", "Medio", 3], ["2", "Alto", 6], ["3", "Épico", 9]] },
+    { "key": "sg.FoliageQuality", "label": "Vegetación", "visual": 1,
+      "levels": [["0", "Baja", 0], ["1", "Media", 2], ["2", "Alta", 5], ["3", "Épica", 8]] },
+    { "key": "sg.AntiAliasingQuality", "label": "Antialiasing", "visual": 1,
+      "levels": [["0", "Bajo", 0], ["1", "Medio", 2], ["2", "Alto", 4], ["3", "Épico", 6]] },
+    { "key": "sg.TextureQuality", "label": "Texturas", "why": "No cuesta FPS mientras quepa en la memoria de la gráfica.",
+      "levels": [["0", "Bajas", 0, { "vram": 1 }], ["1", "Medias", 0, { "vram": 2 }], ["2", "Altas", 0, { "vram": 3 }], ["3", "Épicas", 0, { "vram": 4.5 }]] }
+  ]
+}

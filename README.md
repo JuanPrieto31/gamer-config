@@ -4,12 +4,14 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 
 ## Qué hace
 
-- **Detecta tus juegos** de Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox, también los que instales después.
-- **Calcula la configuración de vídeo** con todo tu hardware: gráfica, VRAM, procesador, hilos, cantidad, canales y velocidad de la RAM, disco, batería, plan de energía, resolución y Hz. Usa los requisitos de Steam de cada juego y el coste de cada ajuste.
+- **Detecta tus juegos** de Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox, también los que instales después, con su portada.
+- **Calcula la configuración de vídeo** con todo tu hardware: gráfica (y su versión de memoria y potencia en portátiles), VRAM, procesador, hilos, cantidad, canales y velocidad de la RAM, disco, batería, plan de energía, resolución y Hz de la pantalla principal. Usa los requisitos de Steam de cada juego y el coste de cada ajuste.
+- **Aprende de tus FPS reales**: cuando mides una partida con las estadísticas en el juego, corrige el cálculo de ese juego en tu PC.
+- **Perfiles propios** para LoL, Apex, Deadlock, Warframe, Dying Light, RE6, Fortnite, Counter-Strike 2, GTA V, Minecraft y Marvel Rivals; los juegos de Unreal Engine y el resto se configuran por detección automática.
 - **Elige un modo**: FPS, Equilibrado o Calidad. Se aplica a un juego o a todos a la vez.
 - **Edita a mano** los ajustes de vídeo del juego, con nombres en español y una explicación de qué hace cada uno.
 - **Optimiza Windows** con permiso, confirmación, historial y deshacer. Comprueba en Windows que cada cambio se aplicó de verdad. Incluye un apartado "Aligerar Windows" para equipos con menos recursos.
-- **Comprueba tus drivers en internet**: la gráfica NVIDIA contra la última versión publicada por NVIDIA, y el resto (chipset, Wi-Fi, red, audio, Bluetooth) contra Windows Update. Enlaza a la página del fabricante, en torre o portátil. La BIOS nunca se actualiza sola.
+- **Comprueba tus drivers en internet**: la gráfica NVIDIA contra la última versión publicada por NVIDIA, y el resto (chipset, Wi-Fi, red, audio, Bluetooth) contra Windows Update. Enlaza a la página del fabricante y abre su programa oficial (Lenovo Vantage, HP Support Assistant, Dell SupportAssist, MyASUS, AMD Software, Intel Driver & Support Assistant…), en torre o portátil. La BIOS nunca se actualiza sola.
 - **Estadísticas en el juego**: FPS, 1 % más bajo, uso y temperatura de la gráfica, VRAM, CPU y RAM encima del juego, con un atajo de teclado. Personalizable (qué mostrar, posición, tamaño, fondo). No inyecta nada en el juego, así que es seguro con los antitrampas, y oculto no consume nada.
 - **Modo juego automático**: al abrir un juego pone el plan de máximo rendimiento y cierra los programas que elijas; al cerrarlo, todo vuelve a como estaba.
 - **Prueba de conexión**: ping hasta el router, internet y varias regiones de servidores, para saber si el lag es de tu Wi-Fi, de tu proveedor o del juego.

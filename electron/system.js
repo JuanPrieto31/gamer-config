@@ -1,13 +1,15 @@
 // Lectura del sistema. SOLO LECTURA: nada de este archivo modifica Windows.
+import { screen } from "electron";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import { statfsSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { scoreOf } from "./gpus.js";
+import { scoreOf, isIntegrated } from "./gpus.js";
 import { cpuScoreOf } from "./cpus.js";
-import { windowsUpdateDrivers, nvidiaLatest, compareVersions } from "./online.js";
+import { windowsUpdateDrivers, nvidiaLatest, compareVersions, clearOnline } from "./online.js";
+import { addCovers } from "./covers.js";
 
 const run = promisify(execFile);
 
@@ -105,30 +107,68 @@ function driveTypes(r) {
   return out;
 }
 
+/** Olvida lo leído del hardware y los drivers (tras cambiar de monitor, actualizar un driver, enchufar una gráfica…). */
+export function redetect() {
+  rawCache = null;
+  driversCache = null;
+  wattsCache = null;
+  hasNvidiaSmi = true;
+  winGpu = null;
+  clearOnline();
+}
+
+// Pantalla donde se juega: la principal (ahí abren los juegos), con su resolución real y sus Hz.
+// Con un monitor externo de 144 Hz, Windows puede dar los datos de la pantalla del portátil; Electron da los de cada pantalla.
+function gameScreen(r) {
+  try {
+    const all = screen.getAllDisplays();
+    const d = screen.getPrimaryDisplay();
+    const w = Math.round(d.bounds.width * d.scaleFactor), h = Math.round(d.bounds.height * d.scaleFactor);
+    if (w > 0 && h > 0) return { refresh: Math.round(d.displayFrequency) || Number(r.refresh) || 60, resW: w, resH: h, pixels: w * h, screens: all.length };
+  } catch { /* antes de que Electron esté listo: lo que diga Windows */ }
+  const w = Number(arr(r.res)[0]) || 1920, h = Number(arr(r.res)[1]) || 1080;
+  return { refresh: Number(r.refresh) || 60, resW: w, resH: h, pixels: w * h, screens: 1 };
+}
+
+// Potencia máxima de una gráfica NVIDIA de portátil (W): la misma RTX 4060 Laptop va de 45 W a 140 W según el modelo.
+let wattsCache = null;
+function nvidiaWatts() {
+  wattsCache ??= run("nvidia-smi", ["--query-gpu=power.max_limit", "--format=csv,noheader,nounits", "-i", "0"], { windowsHide: true })
+    .then(({ stdout }) => Number.parseFloat(stdout) || null, () => null);
+  return wattsCache;
+}
+
 export async function hardware() {
   const r = await raw();
   const gpu = mainGpu(r);
-  const vram = arr(r.vram).find((v) => v.DriverDesc === gpu.Name)?.Mem;
-  const vramGb = vram ? Math.round(vram / GB) : null;
+  const laptop = Boolean(r.laptop);
   const ram = arr(r.ram);
+  const ramGb = Math.round(ram.reduce((s, m) => s + Number(m.Capacity), 0) / GB);
+  const vram = arr(r.vram).find((v) => v.DriverDesc === gpu.Name)?.Mem;
+  let vramGb = vram ? Math.round(vram / GB) : null;
+  // Integradas: usan la RAM del sistema; Windows les deja hasta la mitad, en la práctica ~1/4 sin tirones.
+  if (isIntegrated(gpu.Name)) vramGb = Math.max(vramGb ?? 0, Math.min(Math.floor(ramGb / 4), 8)) || null;
+  // Dedicada sin dato de memoria: el número del nombre ("RTX 3050 6GB") o 4 GB (lo más común).
+  else if (!vramGb) vramGb = Number(gpu.Name.match(/(\d+)\s*GB/i)?.[1]) || 4;
+  const watts = laptop && /nvidia/i.test(gpu.Name) ? await nvidiaWatts() : null;
+  const threads = Number(r.cpu.NumberOfLogicalProcessors) || null;
   return {
     cpu: r.cpu.Name.replace(/\s+/g, " ").trim(),
-    cpuScore: cpuScoreOf(r.cpu.Name),
-    threads: Number(r.cpu.NumberOfLogicalProcessors) || null,
-    ramGb: Math.round(ram.reduce((s, m) => s + Number(m.Capacity), 0) / GB),
+    cpuScore: cpuScoreOf(r.cpu.Name, threads),
+    threads,
+    ramGb,
     ramType: RAM_TYPES[ram[0]?.SMBIOSMemoryType] ?? null,
     ramMhz: Number(ram[0]?.ConfiguredClockSpeed) || null,
     ramModules: ram.length,
     drives: driveTypes(r),
     gpu: gpu.Name,
-    score: scoreOf(gpu.Name, vramGb),
+    // Para elegir variante (RTX 3060 de 8 o 12 GB) solo vale la memoria medida, no la estimada.
+    score: scoreOf(gpu.Name, vram ? Math.round(vram / GB) : null, { laptop, watts }),
+    gpuWatts: watts,
     vendor: /nvidia/i.test(gpu.Name) ? "nvidia" : /amd|radeon/i.test(gpu.Name) ? "amd" : /intel/i.test(gpu.Name) ? "intel" : "other",
     vramGb,
-    refresh: Number(r.refresh) || 60,
-    resW: Number(arr(r.res)[0]) || 1920,
-    resH: Number(arr(r.res)[1]) || 1080,
-    pixels: (Number(arr(r.res)[0]) || 1920) * (Number(arr(r.res)[1]) || 1080),
-    laptop: Boolean(r.laptop),
+    ...gameScreen(r),
+    laptop,
     multiGpu: Number(r.gpuCount) > 1,
     docs: r.docs,
   };
@@ -160,13 +200,39 @@ const cpuTimes = () => os.cpus().reduce((a, c) => {
 let prev = cpuTimes();
 let hasNvidiaSmi = true;
 
+// AMD/Intel: el uso sale del contador de Windows (tarda ~1 s): se lanza en segundo plano y se devuelve la última lectura.
+let winGpu = null;
+let winGpuBusy = false;
+function windowsGpuUsage() {
+  if (!winGpuBusy) {
+    winGpuBusy = true;
+    run("typeperf", ["\\GPU Engine(*engtype_3D)\\Utilization Percentage", "-sc", "1"], { windowsHide: true, timeout: 5000 })
+      .then(({ stdout }) => {
+        // Cabecera: una columna por proceso y motor, con el adaptador ("luid_0x..._0x...") en el nombre.
+        // Se suma por adaptador y se toma el más cargado: en portátiles con dos gráficas no se mezclan.
+        const lines = stdout.split(/\r?\n/);
+        const head = lines.find((l) => l.startsWith('"(PDH'))?.split('","') ?? [];
+        const row = lines.find((l) => /^"\d/.test(l))?.split('","') ?? [];
+        const byAdapter = new Map();
+        head.forEach((h, i) => {
+          const luid = h.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0];
+          if (luid) byAdapter.set(luid, (byAdapter.get(luid) ?? 0) + (Number.parseFloat(String(row[i]).replace(/"/g, "")) || 0));
+        });
+        if (byAdapter.size) winGpu = Math.min(100, Math.round(Math.max(...byAdapter.values())));
+      }, () => {})
+      .finally(() => { winGpuBusy = false; });
+  }
+  return winGpu;
+}
+
 async function gpuUsage() {
-  if (!hasNvidiaSmi) return null;
+  if (!hasNvidiaSmi) return windowsGpuUsage();
   try {
     const { stdout } = await run("nvidia-smi", ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], { windowsHide: true, timeout: 3000 });
     return Number.parseInt(stdout, 10);
-  } catch {
-    hasNvidiaSmi = false; // sin NVIDIA: no se vuelve a intentar
+  } catch (e) {
+    // Solo si nvidia-smi no existe se pasa al contador de Windows; un fallo puntual no cambia la fuente.
+    if (e.code === "ENOENT") { hasNvidiaSmi = false; return windowsGpuUsage(); }
     return null;
   }
 }
@@ -302,6 +368,7 @@ async function epicGames() {
         name: j.DisplayName,
         store: "Epic",
         image: "",
+        catalogId: j.CatalogItemId, // para su portada en el catálogo local de Epic
         sizeGb: Math.round((j.InstallSize / GB) * 10) / 10,
         path: j.InstallLocation,
       });
@@ -413,6 +480,7 @@ export async function games() {
       seen.add(k);
       return true;
     });
+  await addCovers(unique).catch(() => {}); // portadas de los que no son de Steam
   return unique.sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
@@ -438,6 +506,43 @@ const OEM_PAGES = [
   [/microsoft/i, "https://support.microsoft.com/surface"],
 ];
 export const WINDOWS_UPDATE = "ms-settings:windowsupdate-optionalupdates";
+
+// Herramienta oficial de cada fabricante (app: cómo se llama en el menú Inicio; get: dónde conseguirla si no está).
+const OEM_TOOLS = [
+  { maker: /lenovo/i, name: "Lenovo Vantage", app: /vantage|legion space/i, get: "ms-windows-store://pdp/?productid=9WZDNCRFJ4MV" },
+  { maker: /hewlett|^hp\b/i, name: "HP Support Assistant", app: /support assistant/i, get: "https://support.hp.com/us-en/help/hp-support-assistant" },
+  { maker: /dell|alienware/i, name: "Dell SupportAssist", app: /supportassist|command \| update/i, get: "https://www.dell.com/en-us/lp/dt/supportassist-for-home-pcs" },
+  { maker: /asus/i, name: "MyASUS", app: /myasus|armoury crate/i, get: "ms-windows-store://pdp/?productid=9N7R5S6B0ZZH" },
+  { maker: /acer/i, name: "Acer Care Center", app: /care center/i, get: "https://www.acer.com/us-en/support/drivers-and-manuals" },
+  { maker: /micro-star|msi/i, name: "MSI Center", app: /msi center|dragon center/i, get: "https://www.msi.com/Landing/MSI-Center" },
+];
+
+const GPU_TOOLS = [
+  { vendor: /amd|radeon/i, app: /amd software|radeon software|adrenalin/i },
+  { vendor: /intel/i, app: /intel.*(driver|graphics)|arc control/i },
+];
+
+// Abre una app del menú Inicio por su id (solo ids que salen de la propia lectura de Get-StartApps).
+const openApp = (appId) => run("explorer.exe", [`shell:AppsFolder\\${appId}`], { windowsHide: true }).catch(() => {}); // explorer devuelve 1 aunque abra
+
+/** Abre la herramienta del fabricante si está instalada; si no, su página de descarga. */
+export async function openOemTool() {
+  const t = (await localDrivers()).oemTool;
+  if (!t) return null;
+  if (t.installed && t.appId) {
+    await openApp(t.appId);
+    return `Se abrió ${t.name}.`;
+  }
+  return t.get;
+}
+
+/** Abre el programa del fabricante de la gráfica de esa fila (AMD Software, Intel DSA). false si no hay. */
+export async function openGpuTool(itemId) {
+  const it = (await localDrivers()).items.find((i) => i.id === itemId);
+  if (!it?.toolAppId) return false;
+  await openApp(it.toolAppId);
+  return true;
+}
 
 // online: pregunta a Windows Update y a NVIDIA (tarda ~15 s). Sin él se usa lo ya consultado o, si no hay, la antigüedad.
 export async function drivers({ online = false } = {}) {
@@ -498,6 +603,7 @@ async function localDrivers() {
   const r = await ps(`
     $b = Get-CimInstance Win32_BIOS; $c = Get-CimInstance Win32_ComputerSystem; $bb = Get-CimInstance Win32_BaseBoard; $cp = Get-CimInstance Win32_ComputerSystemProduct
     [pscustomobject]@{
+      tools = @(Get-StartApps | Where-Object { $_.Name -match 'Vantage|Legion Space|Support Assistant|SupportAssist|Command \\| Update|MyASUS|Armoury Crate|Care Center|MSI Center|Dragon Center|AMD Software|Radeon Software|Adrenalin|Intel.*Driver.*Support|Intel.*Graphics|Arc Control' } | Select-Object Name, AppID)
       bios = [pscustomobject]@{ maker = [string]$b.Manufacturer; version = [string]$b.SMBIOSBIOSVersion; date = $b.ReleaseDate.ToString('yyyy-MM-dd') }
       pc = [pscustomobject]@{ maker = [string]$c.Manufacturer; model = [string]$c.Model; product = [string]$cp.Version; board = [string]$bb.Manufacturer; boardModel = [string]$bb.Product }
       drivers = @(Get-CimInstance Win32_PnPSignedDriver |
@@ -516,6 +622,10 @@ async function localDrivers() {
   // Lenovo guarda el nombre comercial ("LOQ 15IRH8") en Version; el modelo es un código ("82XV").
   const model = /lenovo/i.test(pcMaker) && r.pc.product && !/^none$/i.test(r.pc.product) ? r.pc.product : r.pc.model;
   const oemName = genericMaker ? `${r.pc.board} ${r.pc.boardModel}`.trim() : `${pcMaker[0]}${pcMaker.slice(1).toLowerCase()} ${model}`.trim();
+  // Portátiles y PCs de marca: la herramienta oficial del fabricante instala los drivers y la BIOS exactos de cada modelo.
+  const tool = genericMaker ? null : OEM_TOOLS.find((t) => t.maker.test(pcMaker));
+  const found = tool && arr(r.tools).find((a) => tool.app.test(a.Name));
+  const oemTool = tool ? { name: found?.Name ?? tool.name, installed: Boolean(found), appId: found?.AppID ?? null, get: tool.get } : null;
 
   // Fechas que no son reales: Intel pone 1968 en sus INF de chipset y Windows 21/06/2006 en sus drivers de serie.
   const realDate = (d) => d && d >= "2008";
@@ -556,7 +666,13 @@ async function localDrivers() {
   const bt = list.find((d) => d.cls === "BLUETOOTH" && !/enumerator|le |rfcomm|microsoft/i.test(d.name));
   if (bt) add("bt", "Bluetooth", bt.name, bt.version, bt.date, oemPage, 30, "Afecta a mandos y auriculares inalámbricos.");
 
-  const value = { pc: oemName, oemPage, items };
+  // Gráficas AMD e Intel: su programa oficial (AMD Software, Intel Driver & Support Assistant) busca e instala su driver.
+  for (const it of items.filter((i) => i.group === "Gráfica")) {
+    const t = GPU_TOOLS.find((x) => x.vendor.test(it.name));
+    const a = t && arr(r.tools).find((x) => t.app.test(x.Name));
+    if (a) Object.assign(it, { toolName: a.Name, toolAppId: a.AppID });
+  }
+  const value = { pc: oemName, oemPage, items, oemTool };
   driversCache = { at: Date.now(), value };
   return value;
 }

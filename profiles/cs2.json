@@ -1,0 +1,30 @@
+{
+  "id": "cs2",
+  "version": 1,
+  "name": "Counter-Strike 2",
+  "games": ["steam-730"],
+  "names": ["Counter-Strike 2"],
+  "config": { "path": "{steam}/userdata/*/730/local/cfg/cs2_video.txt", "format": "kv" },
+  "processes": ["cs2.exe"],
+  "note": "Juego competitivo: lo que más FPS cuesta es el MSAA y las sombras. Las texturas no cuestan FPS si caben en la memoria de la gráfica.",
+  "sources": [
+    { "name": "Valve (cs2_video.txt)", "url": "https://developer.valvesoftware.com/wiki/Counter-Strike_2" }
+  ],
+  "settings": [
+    { "key": "setting.msaa_samples", "label": "Antialiasing (MSAA)", "visual": 2, "why": "El ajuste más caro del juego.",
+      "levels": [["0", "Sin MSAA", 0], ["2", "2x", 6], ["4", "4x", 12], ["8", "8x", 22]] },
+    { "key": "setting.videocfg_shadow_quality", "label": "Sombras", "visual": 2,
+      "levels": [["0", "Bajas", 0, { "cpu": 0 }], ["1", "Medias", 6, { "cpu": 2 }], ["2", "Altas", 12, { "cpu": 4 }], ["3", "Muy altas", 18, { "cpu": 6 }]] },
+    { "key": "setting.videocfg_ao_detail", "label": "Oclusión ambiental", "visual": 1,
+      "levels": [["0", "Desactivada", 0], ["1", "Nivel 1", 4], ["2", "Nivel 2", 7], ["3", "Nivel 3 (máxima)", 10]] },
+    { "key": "setting.videocfg_particle_detail", "label": "Partículas", "visual": 1, "why": "Humo y granadas: se nota en las rondas con muchas utilidades.",
+      "levels": [["0", "Bajas", 0], ["1", "Medias", 2], ["2", "Altas", 4], ["3", "Muy altas", 6]] },
+    { "key": "setting.shaderquality", "label": "Detalle de sombreado", "visual": 1,
+      "levels": [["0", "Bajo", 0], ["1", "Alto", 8]] },
+    { "key": "setting.videocfg_texture_detail", "label": "Texturas", "why": "No cuesta FPS mientras quepa en la memoria de la gráfica.",
+      "levels": [["0", "Bajas", 0, { "vram": 1 }], ["1", "Medias", 0, { "vram": 2 }], ["2", "Altas", 0, { "vram": 3 }]] },
+    { "key": "setting.r_low_latency", "label": "NVIDIA Reflex", "requires": "nvidia", "why": "Menos retraso entre el ratón y la pantalla, sin perder FPS.",
+      "levels": [["0", "Desactivado", 0], ["1", "Activado", 0], ["2", "Activado + Boost", 0]],
+      "fixed": { "fps": "1", "equilibrado": "1", "calidad": "1" } }
+  ]
+}

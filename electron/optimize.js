@@ -18,7 +18,7 @@ import { record } from "./windows.js";
 import { demandFor } from "./demand.js";
 import { solve, factors } from "./calc.js";
 import { findConfigs, autoSettings, genericFormat, detectFormat, parse as parseConfig } from "./autodetect.js";
-import { write as writeConfig } from "./configparse.js";
+import { write as writeConfig, parse } from "./configparse.js";
 
 const run = promisify(execFile);
 const BUNDLED = path.join(path.dirname(fileURLToPath(import.meta.url)), "../profiles");
@@ -160,7 +160,9 @@ const findCache = new Map();
 
 async function findProfile(game, hw) {
   const lib = await library();
-  const own = lib.games.find((p) => p.games.includes(game.id));
+  // Por id de tienda o por nombre ("names"): así un perfil sirve aunque el juego venga de Epic, Rockstar o Xbox.
+  const plain = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const own = lib.games.find((p) => p.games?.includes(game.id) || p.names?.some((n) => plain(n) === plain(game.name)));
   if (own) return { kind: "perfil", profile: own, file: await resolvePath(own.config.path, game, hw), format: own.config.format, processes: own.processes };
 
   const key = `${game.id}|${game.path}`;
@@ -384,6 +386,15 @@ const FORMATS = {
       return close === -1 ? null : `${text.slice(0, close)}\t"${key}"\t\t"${value}"${nl}${text.slice(close)}`;
     },
   },
+  // <Clave value="x" /> (GTA V) y clave:valor (Minecraft): los lee y escribe el analizador general.
+  xml: {
+    read: (text, key) => parse(text, "xml").find((e) => e.key === key)?.value ?? null,
+    write: (text, key, value) => writeConfig(text, "xml", key, value),
+  },
+  colon: {
+    read: (text, key) => parse(text, "colon").find((e) => e.key === key)?.value ?? null,
+    write: (text, key, value) => writeConfig(text, "colon", key, value),
+  },
   // Nombre(valor)  (Chrome Engine / Dying Light). Las líneas con "!" son comentarios.
   scr: {
     read: (text, key) => new RegExp(`^${esc(key)}\\((.*)\\)[ \\t]*$`, "m").exec(text)?.[1].trim() ?? null,
@@ -407,7 +418,7 @@ const labelOf = (s, v) => (v == null ? "No definido" : s.levels.find((l) => same
 
 /* ---------- Plan: cálculo + lo que hay ahora en el archivo ---------- */
 
-async function plan(game, goal) {
+async function plan(game, goal, { raw = false } = {}) {
   const hw = await hardware();
   const found = await findProfile(game, hw);
   const { profile } = found;
@@ -424,11 +435,21 @@ async function plan(game, goal) {
   // (Los perfiles ya traen la memoria exacta que necesita cada nivel.)
   const vramScale = found.kind === "perfil" ? 1
     : Math.max(Math.min(Math.sqrt(scores.gpu / 50), 2), 0.8, demand.vramGb ? demand.vramGb / 5 : 0);
-  const result = solve(profile.settings, hw, scores, goal, f, { vramScale });
-  result.factors = f.list;
-
   const text = found.file ? await fs.readFile(found.file, "utf8").catch(() => null) : null;
   const fmt = found.fmt ?? (found.format ? FORMATS[found.format] : null);
+  // Ajustes que el juego tiene ahora: para estimar sus FPS y compararlos con los medidos por el overlay.
+  const current = new Map(text != null && fmt ? profile.settings.map((s) => [s.key, fmt.read(text, s.key)]).filter(([, v]) => v != null) : []);
+
+  // Calibración con FPS reales de este juego en este PC (si los hay): corrige el cálculo en ambos sentidos.
+  const cal = raw ? null : (await readCalibration())[game.id];
+  const mult = cal ? { ...f, gpu: f.gpu * cal.factor, cpu: f.cpu * cal.factor } : f;
+  if (cal) {
+    const pct = Math.round((cal.factor - 1) * 100);
+    f.list.push({ label: "Tus FPS reales", value: `${cal.sessions} ${cal.sessions === 1 ? "partida" : "partidas"}`, effect: "info",
+      note: Math.abs(pct) < 3 ? "Medidos con el overlay: coinciden con lo estimado" : `Medidos con el overlay: este juego te va un ${Math.abs(pct)} % ${pct > 0 ? "mejor" : "peor"} de lo estimado; el cálculo ya lo tiene en cuenta` });
+  }
+  const result = solve(profile.settings, hw, scores, goal, mult, { vramScale, current });
+  result.factors = f.list;
   const settings = profile.settings
     .filter((s) => result.picks.has(s.key))
     .map((s) => {
@@ -443,6 +464,29 @@ async function plan(game, goal) {
 }
 
 /* ---------- Estado, detalle y aplicar ---------- */
+
+/* ---------- Calibración con FPS reales (overlay) ---------- */
+
+const calFile = () => userDir("calibracion.json");
+const readCalibration = async () => JSON.parse(await fs.readFile(calFile(), "utf8").catch(() => "{}"));
+
+/**
+ * Una partida medida por el overlay: FPS reales (mediana) frente a los estimados para los ajustes que tenía el juego.
+ * Se guarda un factor por juego (entre ×0,5 y ×2) que se va suavizando partida a partida. Todo local.
+ */
+export async function calibrate(game, measuredFps) {
+  const p = await plan(game, "equilibrado", { raw: true }).catch(() => null);
+  const est = p?.result.estCurrent;
+  if (!est || !measuredFps) return null; // sin archivo de ajustes no se sabe qué se estaba midiendo
+  const ratio = Math.min(Math.max(measuredFps / est, 0.5), 2);
+  const all = await readCalibration();
+  const prev = all[game.id];
+  const factor = prev ? prev.factor * 0.6 + ratio * 0.4 : ratio;
+  all[game.id] = { factor: Math.round(factor * 100) / 100, sessions: (prev?.sessions ?? 0) + 1, lastMeasured: Math.round(measuredFps), lastEstimated: est, at: new Date().toISOString() };
+  await fs.mkdir(userDir(), { recursive: true });
+  await fs.writeFile(calFile(), JSON.stringify(all, null, 1));
+  return all[game.id];
+}
 
 const appliedFile = () => userDir("applied.json");
 const readApplied = async () => JSON.parse(await fs.readFile(appliedFile(), "utf8").catch(() => "{}"));
@@ -472,6 +516,7 @@ export async function detail(game, goal) {
     bottleneck: p.result.bottleneck,
     estMax: p.result.estMax,
     estFinal: p.result.estFinal,
+    estCurrent: p.result.estCurrent,
     target: p.result.target,
     reached: p.result.reached,
     loweredNothing: p.result.loweredNothing,

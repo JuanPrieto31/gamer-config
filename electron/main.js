@@ -238,11 +238,22 @@ const handlers = {
   // Actualización de la app.
   "update-status": () => updateReady,
   "update-install": () => { quitting = true; autoUpdater.quitAndInstall(); },
+  // Volver a leer el hardware y los drivers (cambio de monitor, driver nuevo...).
+  redetect: async () => {
+    system.redetect();
+    return system.specs();
+  },
   history: () => win.history(),
   undo: (id) => win.undo(id),
   drivers: (online) => system.drivers({ online: online === true }),
   // Solo abre páginas que salen de la lista de drivers (nunca una dirección que mande la interfaz).
   "open-update": async (id) => {
+    if (id === "oem-tool") {
+      const r = await system.openOemTool();
+      if (r && /^(https:|ms-windows-store:)/.test(r)) await shell.openExternal(r);
+      return;
+    }
+    if (await system.openGpuTool(id)) return; // AMD Software / Intel DSA instalado: se abre el programa
     const d = await system.drivers();
     const page = id === "windows-update" ? system.WINDOWS_UPDATE : d.items.find((i) => i.id === id)?.page ?? d.oemPage;
     await shell.openExternal(page);
@@ -296,6 +307,12 @@ app.whenReady().then(() => {
   gamemode.init({
     notify: (title, content) => tray?.displayBalloon({ title, content }),
     overlay: (on) => (on ? overlay.show() : overlay.hide()),
+  });
+  // Partida medida por el overlay → se calibra el cálculo de ese juego con sus FPS reales.
+  overlay.setSessionHandler(async (exe, fps) => {
+    const name = gamemode.index.get(String(exe).toLowerCase())?.name;
+    const game = name && knownGames.find((g) => g.name === name);
+    if (game) await optimize.calibrate(game, fps).catch(() => {});
   });
   checkUpdates();
   optimize.updateProfiles().catch(() => {});

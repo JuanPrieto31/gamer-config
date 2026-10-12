@@ -13,6 +13,8 @@ export function detectFormat(text, file = "") {
   if ((t.match(/^\s*"[^"\n]+"\s+"[^"\n]*"\s*$/gm) ?? []).length >= 3) return "kv";
   if ((t.match(/^\w+\(.*\)\s*$/gm) ?? []).length >= 3) return "scr";
   if ((t.match(/^\s*[^#;/\s=][^=\n]*=.*$/gm) ?? []).length >= 2) return "ini";
+  // clave:valor solo en el options.txt de Minecraft: en otros archivos esas líneas pueden ser otra cosa (host:localhost...).
+  if (/options\.txt$/i.test(file) && /^renderDistance:/m.test(t)) return "colon";
   if ((t.match(/^\s*[a-z_][\w.]*\s+"?[^\s"]+"?\s*$/gim) ?? []).length >= 3) return "space"; // cl_algo "1"
   return null;
 }
@@ -43,11 +45,13 @@ function flattenJson(obj, prefix = "", out = []) {
 const XML_NAMED = /<(\w+)\s+name="([^"]+)"[^>]*>([^<]*)<\/\1>/g; // <int name="Quality">5</int> (Roblox, etc.)
 const XML_LEAF = /<(\w+)>([^<>]*)<\/\1>/g; //                      <ShadowQuality>2</ShadowQuality>
 const XML_ATTR = /<\w+\s+(?:name|key|id)="([^"]+)"\s+value="([^"]*)"/g; // <Setting name="x" value="y"/>
+const XML_VALUE = /<(\w+)\s+value="([^"]*)"\s*\/?>/g; //            <ShadowQuality value="2" /> (GTA V)
 
 function parseXml(text) {
   const out = [];
   for (const m of text.matchAll(XML_NAMED)) out.push({ key: m[2], value: m[3].trim() });
   for (const m of text.matchAll(XML_ATTR)) out.push({ key: m[1], value: m[2] });
+  if (out.length === 0) for (const m of text.matchAll(XML_VALUE)) out.push({ key: m[1], value: m[2] });
   if (out.length === 0) for (const m of text.matchAll(XML_LEAF)) out.push({ key: m[1], value: m[2].trim() });
   return out;
 }
@@ -61,6 +65,7 @@ export function parse(text, format) {
     case "kv": return [...t.matchAll(/^\s*"([^"\n]+)"\s+"([^"\n]*)"\s*$/gm)].map((m) => ({ key: m[1], value: m[2] }));
     case "scr": return [...t.matchAll(/^(\w+)\((.*)\)\s*$/gm)].map((m) => ({ key: m[1], value: m[2].trim() }));
     case "space": return [...t.matchAll(/^\s*([a-z_][\w.]*)\s+"?([^\s"]+)"?\s*$/gim)].map((m) => ({ key: m[1], value: m[2] }));
+    case "colon": return [...t.matchAll(/^([A-Za-z_][\w.]*):(.*)$/gm)].map((m) => ({ key: m[1], value: m[2].trim() })); // Minecraft
     default: return [];
   }
 }
@@ -106,6 +111,8 @@ function writeXml(text, key, raw) {
   if (named.test(text)) return text.replace(named, (_, a, __, ___, d) => `${a}${value}${d}`);
   const attr = new RegExp(`(<\\w+\\s+(?:name|key|id)="${esc(key)}"\\s+value=")([^"]*)(")`);
   if (attr.test(text)) return text.replace(attr, (_, a, __, c) => `${a}${value}${c}`);
+  const valueAttr = new RegExp(`(<${esc(key)}\\s+value=")([^"]*)(")`);
+  if (valueAttr.test(text)) return text.replace(valueAttr, (_, a, __, c) => `${a}${value}${c}`);
   const leaf = new RegExp(`(<${esc(key)}>)([^<>]*)(<\\/${esc(key)}>)`);
   if (leaf.test(text)) return text.replace(leaf, (_, a, __, c) => `${a}${value}${c}`);
   return null;
@@ -123,6 +130,7 @@ export function write(text, format, key, value) {
     case "kv": return replaceLine(text, new RegExp(`^(\\s*"${esc(key)}"\\s+")([^"\\n]*)(")`, "m"), (_, a, __, c) => `${a}${value}${c}`);
     case "scr": return replaceLine(text, new RegExp(`^(${esc(key)}\\()(.*)(\\)\\s*)$`, "m"), (_, a, __, c) => `${a}${value}${c}`);
     case "space": return replaceLine(text, new RegExp(`^(\\s*${esc(key)}\\s+"?)([^\\s"]+)("?\\s*)$`, "mi"), (_, a, __, c) => `${a}${value}${c}`);
+    case "colon": return replaceLine(text, new RegExp(`^(${esc(key)}:)(.*)$`, "m"), (_, a) => `${a}${value}`);
     default: return null;
   }
 }

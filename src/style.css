@@ -513,3 +513,11 @@ kbd { font: 600 12px/1 Consolas, monospace; padding: 2px 6px; border: 1px solid 
 
 /* ---------- Aviso de actualización ---------- */
 .update-banner { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); font-size: 13px; }
+
+/* Herramienta del fabricante en Drivers y BIOS */
+.oem-tool { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.oem-tool > div { display: grid; gap: 2px; }
+
+/* Portada que en realidad es un icono (Riot, Xbox, Roblox): centrada y entera sobre un fondo neutro */
+.cover.icon { background: var(--surface-2); }
+.cover.icon img { object-fit: contain; padding: 14%; }

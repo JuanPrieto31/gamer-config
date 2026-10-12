@@ -194,6 +194,45 @@ async function configFilesIn(dir, depth, strictNames) {
   return found;
 }
 
+// Juegos populares cuyo archivo de ajustes está en una carpeta que no se llama como el juego.
+// {local} = %LOCALAPPDATA%, {roaming} = %APPDATA%, {docs} = Documentos; "*" = cualquier carpeta (id de usuario, etc.).
+const KNOWN_FILES = {
+  valorant: ["{local}/VALORANT/Saved/Config/*/Windows/RiotUserSettings.ini", "{local}/VALORANT/Saved/Config/*/Windows/GameUserSettings.ini"],
+  cyberpunk2077: ["{local}/CD Projekt Red/Cyberpunk 2077/UserSettings.json"],
+  eldenring: ["{roaming}/EldenRing/*/GraphicsConfig.xml"],
+  overwatch: ["{docs}/Overwatch/Settings/Settings_v0.ini"],
+  overwatch2: ["{docs}/Overwatch/Settings/Settings_v0.ini"],
+  rocketleague: ["{docs}/My Games/Rocket League/TAGame/Config/TASystemSettings.ini"],
+};
+
+// Expande una ruta con "*" (en cualquier tramo) a los archivos que existen.
+async function expand(pattern) {
+  const parts = pattern.split("/");
+  let paths = [parts.shift()];
+  for (const part of parts) {
+    const next = [];
+    for (const p of paths) {
+      if (part !== "*") { next.push(path.join(p, part)); continue; }
+      for (const e of await fs.readdir(p, { withFileTypes: true }).catch(() => [])) if (e.isDirectory()) next.push(path.join(p, e.name));
+    }
+    paths = next.slice(0, 50);
+  }
+  const out = [];
+  for (const p of paths) {
+    const st = await fs.stat(p).catch(() => null);
+    if (st?.isFile()) out.push({ file: p, mtime: st.mtimeMs });
+  }
+  return out;
+}
+
+async function knownFiles(game, docs) {
+  const patterns = KNOWN_FILES[norm(game.name)] ?? [];
+  const tokens = { local: process.env.LOCALAPPDATA ?? "", roaming: process.env.APPDATA ?? "", docs: docs ?? "" };
+  const found = [];
+  for (const p of patterns) found.push(...(await expand(p.replace(/\{(\w+)\}/g, (_, k) => tokens[k]).replace(/\\/g, "/"))));
+  return found;
+}
+
 /**
  * Busca archivos de configuración del juego y se queda con los que tienen ajustes gráficos reconocibles.
  * Devuelve [{ file, format, entries, tunable }] ordenados del mejor al peor.
@@ -216,7 +255,9 @@ export async function findConfigs(game, { docs, steam }, { all = false } = {}) {
     }, { n: 1500 });
   }
 
-  const candidates = [];
+  // Primero las rutas conocidas (van delante en el orden final aunque tengan menos ajustes reconocidos).
+  const known = (await knownFiles(game, docs)).map((c) => ({ ...c, known: true }));
+  const candidates = [...known];
   for (const d of dirs) candidates.push(...(await configFilesIn(d, 4, false)));
   if (game.path) candidates.push(...(await configFilesIn(game.path, 3, true)));
   const appId = game.id.startsWith("steam-") ? game.id.slice(6) : null;
@@ -240,9 +281,9 @@ export async function findConfigs(game, { docs, steam }, { all = false } = {}) {
     try { entries = parse(text, format); } catch { continue; }
     const tunable = autoSettings(entries).length;
     // all: también archivos sin ajustes gráficos (controles, audio...) para poder verlos y editarlos a mano.
-    if (tunable >= 2 || (all && entries.length >= 2)) results.push({ file: c.file, format, entries, tunable, mtime: c.mtime });
+    if (tunable >= 2 || (c.known && entries.length >= 2) || (all && entries.length >= 2)) results.push({ file: c.file, format, entries, tunable, mtime: c.mtime, known: Boolean(c.known) });
   }
-  return results.sort((a, b) => b.tunable - a.tunable || b.mtime - a.mtime).slice(0, all ? 8 : 3);
+  return results.sort((a, b) => Number(b.known) - Number(a.known) || b.tunable - a.tunable || b.mtime - a.mtime).slice(0, all ? 8 : 3);
 }
 
 // Adaptador para leer/escribir un ajuste en un archivo de formato detectado.

@@ -39,13 +39,19 @@ function one(n) {
   }
   // Intel Core de 1.ª generación, modelo de 3 cifras (i7 860, i5 750, i3 530)
   if ((m = n.match(/i([3579])[\s-]*(\d{3})([a-z]*)\b/))) return Math.round(38 * (m[1] === "3" ? 0.65 : INTEL_TIER[m[1]]) * mobileFactor(m[3]));
+  // Intel de gama baja (N100/N200, i3-N305): antes que "Core i3 sin modelo", que también los atraparía.
+  if (/core\s*i3[\s-]*n3\d{2}/.test(n)) return 45; // i3-N305 (8 núcleos pequeños)
+  if (/\bn\s*(50|9[57]|100|150|200|250|300|355)\b/.test(n)) return 35; // portátiles y mini PC baratos
   // Intel Core i5 sin modelo ("Intel Core i5 or equivalent")
   if ((m = n.match(/core\s*i([3579])\b/))) return Math.round(70 * INTEL_TIER[m[1]]);
   // AMD Ryzen 3/5/7/9 XXXX(X3D / H / U...)
   if ((m = n.match(/ryzen\s*([3579])\s*(?:pro\s*)?(\d)(\d{3})([a-z0-9]*)/))) {
     let base = RYZEN_GEN[m[2]] ?? 100;
     const suffix = m[4];
-    if (m[2] === "7" && /^(h|hs|u)/.test(suffix) && Number(m[3][1]) < 4) base = 110; // 7x35 = Zen 3+
+    // Portátiles con número engañoso: 7x20 = Zen 2, 7x30/7x35 = Zen 3/3+; 5300U/5500U/5700U = Zen 2.
+    if (m[2] === "7" && /^(h|hs|u)/.test(suffix) && m[3][1] === "2") base = 95;
+    else if (m[2] === "7" && /^(h|hs|u)/.test(suffix) && m[3][1] === "3") base = 110;
+    else if (m[2] === "5" && /^u/.test(suffix) && /^[357]00$/.test(m[3])) base = 100;
     if (/x3d/.test(suffix)) base *= 1.2;
     return Math.round(base * RYZEN_TIER[m[1]] * mobileFactor(suffix.replace(/^x3d|^x/, "")));
   }
@@ -53,6 +59,9 @@ function one(n) {
   if ((m = n.match(/ryzen\s*([3579])\b/))) return Math.round(100 * RYZEN_TIER[m[1]]);
   if ((m = n.match(/ryzen\s*ai\s*([579])/))) return Math.round(150 * RYZEN_TIER[m[1]] * 0.85);
   // Antiguos y de entrada
+  if (/atom/.test(n)) return 12;
+  // Portátiles con Snapdragon (ARM): los juegos van emulados.
+  if (/snapdragon/.test(n)) return 60;
   if (/fx[\s-]*(8|9)\d{3}/.test(n)) return 40;
   if (/fx[\s-]*\d{4}/.test(n)) return 32;
   if (/phenom/.test(n)) return 25;
@@ -68,9 +77,12 @@ function one(n) {
   return null;
 }
 
-// Tu procesador.
-export function cpuScoreOf(name) {
-  return one(clean(name)) ?? 80; // desconocido: se asume uno de gama media
+// Tu procesador. Si no se reconoce, se estima por sus hilos (antes se suponía uno de gama media siempre).
+export function cpuScoreOf(name, threads = null) {
+  const s = one(clean(name));
+  if (s != null) return s;
+  if (!threads) return 80;
+  return threads <= 4 ? 40 : threads <= 8 ? 65 : threads <= 12 ? 85 : 100;
 }
 
 // Lo que pide un texto de requisitos ("Intel Core i5 3570K or AMD FX-8310"): media de los que se reconocen.

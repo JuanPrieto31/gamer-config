@@ -39,6 +39,31 @@
       "id": "generic",
       "file": "engines/generic.json",
       "version": 3
+    },
+    {
+      "id": "fortnite",
+      "file": "fortnite.json",
+      "version": 1
+    },
+    {
+      "id": "cs2",
+      "file": "cs2.json",
+      "version": 1
+    },
+    {
+      "id": "gtav",
+      "file": "gtav.json",
+      "version": 1
+    },
+    {
+      "id": "minecraft",
+      "file": "minecraft.json",
+      "version": 1
+    },
+    {
+      "id": "marvelrivals",
+      "file": "marvelrivals.json",
+      "version": 1
     }
   ]
 }

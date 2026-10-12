@@ -24,6 +24,11 @@ async function cached(key, fn, onlyCache = false) {
   return pending.get(key);
 }
 
+/** Olvida lo consultado (tras "Volver a detectar": puede que se acabe de instalar un driver). */
+export function clearOnline() {
+  cache.clear();
+}
+
 /** Drivers que Windows Update tiene pendientes para este PC (los publica el fabricante). null si no se pudo consultar. */
 export function windowsUpdateDrivers(onlyCache = false) {
   return cached("wu", async () => {

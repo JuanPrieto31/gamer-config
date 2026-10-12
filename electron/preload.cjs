@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("afina", {
   history: call("history"),
   undo: call("undo"),
   drivers: call("drivers"),
+  redetect: call("redetect"),
   overlayGet: call("overlay-get"),
   overlaySet: call("overlay-set"),
   overlayToggle: call("overlay-toggle"),

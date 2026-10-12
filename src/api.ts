@@ -13,8 +13,9 @@ export interface StartupApp { id: string; name: string; publisher: string; enabl
 export interface Game {
   id: string;
   name: string;
-  store: "Steam" | "Epic" | "Riot";
+  store: string;
   image: string; // "" = sin portada
+  imageFit?: "icon"; // un icono (Riot, Xbox, Roblox): se muestra centrado, no estirado
   sizeGb: number | null;
   status: "optimizado" | "optimizable" | "guía";
 }
@@ -63,10 +64,16 @@ export interface DriverItem {
   ageMonths: number | null;
   outdated: boolean;
   note: string | null;
+  toolName?: string; // programa del fabricante de la gráfica instalado (AMD Software, Intel DSA)
   latest: string | null; // última versión publicada (NVIDIA) o la actualización que ofrece Windows Update
   source: "nvidia" | "windows-update" | "antigüedad";
 }
-export interface DriverInfo { pc: string; items: DriverItem[]; checked: { windowsUpdate: boolean; nvidia: boolean } }
+export interface DriverInfo {
+  pc: string;
+  items: DriverItem[];
+  checked: { windowsUpdate: boolean; nvidia: boolean };
+  oemTool?: { name: string; installed: boolean } | null; // herramienta del fabricante (Lenovo Vantage, HP Support Assistant…)
+}
 
 export type OverlayMetric = "fps" | "low1" | "frametime" | "gpu" | "gpuTemp" | "vram" | "gpuClock" | "gpuPower" | "cpu" | "ram";
 export interface OverlaySettings {
@@ -124,7 +131,8 @@ interface Bridge {
   winAction(id: string, arg?: unknown): Promise<ActionResult>;
   history(): Promise<HistoryEntry[]>;
   undo(id: number): Promise<string>;
-  drivers(online?: boolean): Promise<DriverInfo>; // online: pregunta a Windows Update y a NVIDIA (~15 s)
+  drivers(online?: boolean): Promise<DriverInfo>;
+  redetect(): Promise<Specs>; // online: pregunta a Windows Update y a NVIDIA (~15 s)
   openUpdate(id: string): Promise<void>;
   overlayGet(): Promise<OverlayState>;
   overlaySet(patch: Partial<OverlaySettings>): Promise<OverlaySettings>;
@@ -245,6 +253,7 @@ const mock: Bridge = {
     ] };
   },
   async openUpdate() {},
+  async redetect() { return this.specs(); },
   async overlayGet() {
     return { settings: { ...mockOverlay }, visible: false, fpsReady: false, hotkeyOk: true };
   },

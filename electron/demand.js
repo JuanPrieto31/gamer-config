@@ -90,7 +90,7 @@ async function fromSteam(appId) {
 }
 
 // Juegos fuera de Steam: se busca en Steam por nombre exacto (muchos están en las dos tiendas).
-async function steamIdByName(name) {
+export async function steamIdByName(name) {
   const j = await steamApi(`storesearch/?term=${encodeURIComponent(name)}&cc=us&l=english`);
   return j?.items?.find((i) => simple(i.name) === simple(name))?.id ?? null;
 }
@@ -100,7 +100,8 @@ async function steamIdByName(name) {
 const OUTSIDE_STEAM = {
   roblox: { gpu: "GT 1030", cpu: "Intel Core i3-6100", ram: 8 },
   fortnite: { gpu: "GTX 960 / R9 280", cpu: "Intel Core i5-7300U", ram: 16 },
-  valorant: { gpu: "GTX 1050 Ti / Radeon R7 370", cpu: "Intel Core i3-4150 / Ryzen 3 1200", ram: 4 },
+  // Riot da tres niveles: 30 FPS (Intel HD 4000), 60 FPS (GT 730) y 144 FPS (GTX 1050 Ti). Aquí va el de 60.
+  valorant: { gpu: "GT 730", cpu: "Intel Core i3-4150", ram: 4 },
   teamfighttactics: { gpu: "GTX 1050", cpu: "Intel Core i5-3300 / Ryzen 3 1200", ram: 8 },
   minecraft: { gpu: "GTX 750 Ti", cpu: "Intel Core i5-4690 / AMD A10-7800", ram: 8 },
   minecraftlauncher: { gpu: "GTX 750 Ti", cpu: "Intel Core i5-4690 / AMD A10-7800", ram: 8 },

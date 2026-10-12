@@ -44,7 +44,9 @@ export function factors(hw, demand, ctx) {
   const resLoss = Math.round((1 - Math.pow(BASE_PIXELS / (hw.pixels || BASE_PIXELS), 0.8)) * 100);
   add("Resolución", `${hw.resW ?? 1920}×${hw.resH ?? 1080}`, "info",
     resLoss > 2 ? `Más píxeles que 1080p: la gráfica rinde ~${resLoss} % menos` : resLoss < -2 ? `Menos píxeles que 1080p: la gráfica rinde ~${-resLoss} % más` : "La resolución de referencia del cálculo");
-  add("Pantalla", `${hw.refresh} Hz`, "info", "Marca el objetivo de FPS");
+  add("Pantalla", `${hw.refresh} Hz`, "info", hw.screens > 1
+    ? `Marca el objetivo de FPS. Tienes ${hw.screens} pantallas: se calcula para la principal, que es donde abren los juegos`
+    : "Marca el objetivo de FPS");
 
   // Memoria RAM
   if (demand.ramGb) {
@@ -104,7 +106,7 @@ export function factors(hw, demand, ctx) {
  * mult: { gpu, cpu } multiplicadores del resto de especificaciones (ver factors)
  */
 export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opts = {}) {
-  const target = targetFps(goal, hw.refresh);
+  let target = targetFps(goal, hw.refresh);
   const res = Math.pow(BASE_PIXELS / (hw.pixels || BASE_PIXELS), 0.8);
   // FPS con los ajustes en "Alto" (a lo que apuntan los requisitos recomendados, no a Ultra).
   const gpuAtHigh = GPU_BASE * (hw.score / Math.max(demand.gpu, 1)) * res * mult.gpu;
@@ -127,10 +129,19 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
     }
   }
 
-  const load = (field) => 1 + tunable.reduce((t, x) => t + (x.s.levels[x.i][field] ?? 0) / 100, 0);
-  // Configuración "Alto" de referencia: cada ajuste a ~2/3 de su escala (Alto en Bajo/Medio/Alto/Ultra).
+  let costScale = 1;
+  const load = (field) => 1 + tunable.reduce((t, x) => t + (x.s.levels[x.i][field] ?? 0) / 100, 0) * (field === "cost" ? costScale : 1);
+  const setAll = (pos) => tunable.forEach((x) => { x.i = Math.round((x.s.levels.length - 1) * pos); });
   const top = tunable.map((x) => x.i);
-  tunable.forEach((x) => { x.i = Math.round((x.s.levels.length - 1) * 0.67); });
+  // Calibración: en los benchmarks, pasar un juego de Alto a Bajo suele dar ×1,7 FPS (de ×1,5 a ×2,2).
+  // Si los costes del perfil suman menos, se escalan todos por igual (mantienen su peso relativo entre ajustes);
+  // si no, en PCs modestos todo acababa al mínimo sin llegar al objetivo.
+  // ponytail: un solo factor global; si un juego concreto escala distinto, se ajusta en su perfil.
+  const SPREAD = 1.7;
+  setAll(0.67);
+  const rawHigh = load("cost");
+  if (rawHigh > 1 && rawHigh < SPREAD) costScale = (SPREAD - 1) / (rawHigh - 1);
+  // Configuración "Alto" de referencia: cada ajuste a ~2/3 de su escala (Alto en Bajo/Medio/Alto/Ultra).
   const highGpu = load("cost");
   const highCpu = load("cpu");
   tunable.forEach((x, n) => { x.i = top[n]; });
@@ -140,6 +151,29 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
     return { g, c, fps: Math.min(g, c) };
   };
   const atMax = now();
+
+  // FPS estimados con los ajustes que el juego tiene ahora (opts.current: clave → valor): sirven para comparar
+  // con los FPS reales que mide el overlay y calibrar el cálculo de ese juego.
+  let estCurrent = null;
+  if (opts.current?.size) {
+    tunable.forEach((x) => {
+      const plain = (v) => String(v ?? "").replace(/\s+|"/g, "").toLowerCase();
+      const i = x.s.levels.findIndex((l) => plain(l.value) === plain(opts.current.get(x.s.key)));
+      if (i >= 0) x.i = i;
+    });
+    estCurrent = Math.round(now().fps);
+    tunable.forEach((x, n) => { x.i = top[n]; });
+  }
+
+  // Si ni con todo al mínimo se llega, en Equilibrado y Calidad se apunta a algo alcanzable (45 / 30 estables,
+  // o el 90 % de lo máximo si está por encima) en vez de dejarlo todo al mínimo para no llegar igualmente.
+  // Si ni siquiera se llega a 45 / 30, se deja ese suelo a propósito: todo queda al mínimo para sacar los máximos
+  // FPS (subir calidad a 18 FPS no tiene sentido) y el resultado marca que no se llega. En modo FPS, siempre el máximo.
+  setAll(0);
+  const atMin = now().fps;
+  tunable.forEach((x, n) => { x.i = top[n]; });
+  const floor = goal === "calidad" ? 30 : 45;
+  if (goal !== "fps" && atMin < target && target > floor) target = Math.max(floor, Math.min(target, Math.floor(atMin * 0.9)));
 
   while (now().fps < target) {
     const before = now().fps;
@@ -168,6 +202,7 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
     estMax: Math.round(atMax.fps),
     loweredNothing: tunable.every((x, n) => x.i === top[n]),
     estFinal: Math.round(end.fps),
+    estCurrent,
     gpuFps: Math.round(end.g),
     cpuFps: Math.round(end.c),
     bottleneck: end.c < end.g ? "cpu" : "gpu",

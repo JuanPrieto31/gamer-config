@@ -133,12 +133,35 @@ function startFps() {
 }
 
 // Cada segundo: el programa con más fotogramas es el juego. FPS = fotogramas reales del último segundo.
+// Partida en curso (para calibrar el cálculo con FPS reales): exe del juego y FPS de cada segundo.
+let played = { exe: null, fps: [] };
+let onSession = () => {};
+export const setSessionHandler = (fn) => { onSession = fn; };
+const CAPS = [30, 60, 72, 75, 90, 100, 120, 144, 165, 170, 180, 200, 240, 360];
+
+// Al acabar una partida (o cambiar de juego, u ocultar el overlay): mediana de FPS si sirve para calibrar.
+function flushPlayed() {
+  const { exe, fps } = played;
+  played = { exe: null, fps: [] };
+  if (!exe || fps.length < 60) return; // menos de un minuto: no es representativo
+  const sorted = [...fps].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const mean = fps.reduce((a, b) => a + b, 0) / fps.length;
+  const cv = Math.sqrt(fps.reduce((a, b) => a + (b - mean) ** 2, 0) / fps.length) / mean;
+  // FPS clavados en un tope (V-Sync o límite del juego): miden el tope, no lo que da el PC. No se usan.
+  // Sin tope, los FPS de una partida varían bastante; casi fijos = tope, aunque sea uno raro (50, 58...).
+  if (cv < 0.025 || (cv < 0.04 && CAPS.some((c) => Math.abs(median - c) / c < 0.03))) return;
+  onSession(exe, median);
+}
+
 function tickFps() {
   let best = null;
   for (const [name, list] of frames) if (!best || list.length > best[1].length) best = [name, list];
   frames = new Map();
   if (!best || best[1].length < 2) { Object.assign(stats, { fps: null, low1: null, frametime: null, game: null }); return; }
-  if (best[0] !== current) { current = best[0]; history = []; }
+  if (best[0] !== current) { flushPlayed(); current = best[0]; history = []; }
+  if (played.exe !== current) played = { exe: current, fps: [] };
+  played.fps.push(best[1].length); // fotogramas presentados en este segundo
   history.push(...best[1]);
   if (history.length > 5000) history = history.slice(-5000);
   const avg = best[1].reduce((a, b) => a + b, 0) / best[1].length;
@@ -169,6 +192,7 @@ function startSampling() {
 }
 
 function stopSampling() {
+  flushPlayed();
   session++;
   clearInterval(timer);
   timer = null;

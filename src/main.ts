@@ -200,6 +200,21 @@ async function gameModeSet(patch: Partial<GameModeSettings>) {
   rerender();
 }
 
+// Vuelve a leer el hardware y los drivers (y todo lo que depende de ellos).
+async function redetect() {
+  toast("Volviendo a detectar el hardware…");
+  try {
+    state.specs = await api.redetect();
+    state.drivers = null;
+    state.driversAutoTried = false;
+    state.detail = null;
+    toast("Hardware detectado de nuevo.");
+  } catch (e) {
+    toast(errorText(e), true);
+  }
+  rerender();
+}
+
 /* ---------- Prueba de conexión ---------- */
 
 function netPanel() {
@@ -288,7 +303,7 @@ const VIEWS: Record<View, () => string> = {
           ${findingsList()}
         </section>
         <section class="block specs">
-          <h2>Tu equipo</h2>
+          <div class="table-head"><h2>Tu equipo</h2><button class="link" data-act="redetect">Volver a detectar</button></div>
           ${s ? `<dl>
             ${spec("Procesador", s.cpu)}
             ${spec("Gráfica", s.gpu)}
@@ -412,7 +427,7 @@ function meter(k: keyof Usage, label: string, value: number | null | undefined, 
 }
 
 const cover = (g: Game, big = false) =>
-  `<div class="cover${big ? " big" : ""}">${g.image ? `<img src="${g.image}" alt="" loading="lazy" />` : ""}<span class="fallback">${esc(g.name[0])}</span></div>`;
+  `<div class="cover${big ? " big" : ""}${g.imageFit === "icon" ? " icon" : ""}">${g.image ? `<img src="${g.image}" alt="" loading="lazy" />` : ""}<span class="fallback">${esc(g.name[0])}</span></div>`;
 
 const gameMeta = (g: Game) => (g.sizeGb == null ? g.store : `${g.store} · ${g.sizeGb.toLocaleString("es")} GB`);
 const spec = (k: string, v: string) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`;
@@ -632,7 +647,16 @@ function driversList() {
   if (!d) return `<div class="sk-list">${skel(4)}</div>`;
   const old = d.items.filter((i) => i.outdated).length;
   const online = d.checked.windowsUpdate || d.checked.nvidia;
+  const t = d.oemTool;
   return `
+    ${t ? `
+      <div class="oem-tool">
+        <div>
+          <strong>${esc(t.name)}</strong>
+          <span class="muted small">${t.installed ? `La herramienta oficial de tu ${esc(d.pc)}: instala los drivers y la BIOS exactos de tu modelo.` : `No la tienes instalada. Es la herramienta oficial de tu ${esc(d.pc)} para instalar los drivers y la BIOS exactos de tu modelo.`}</span>
+        </div>
+        <button class="btn sm ${t.installed ? "primary" : ""}" data-update="oem-tool">${t.installed ? "Abrir" : "Descargar"}</button>
+      </div>` : ""}
     <p class="count">${driversPending() ? "Comprobando…" : old === 0 ? "Todo al día" : `${old} por actualizar`}</p>
     <p class="muted small drivers-source">${state.driversChecking ? "Comprobando en internet con Windows Update y NVIDIA…"
       : online ? `Comprobado en internet${d.checked.windowsUpdate ? " con Windows Update" : ""}${d.checked.nvidia ? `${d.checked.windowsUpdate ? " y" : " con"} NVIDIA` : ""}.`
@@ -647,7 +671,7 @@ function driversList() {
             ${i.outdated && i.note ? `<span class="muted small">${esc(i.note)}</span>` : ""}
           </div>
           ${driversPending() && i.source === "antigüedad" ? `<span class="tag">Comprobando…</span>` : `<span class="tag ${i.outdated ? "warn" : "ok"}">${driverTag(i)}</span>`}
-          <button class="btn sm" data-update="${i.id}">${i.group === "BIOS" ? "Ver BIOS" : i.source === "windows-update" && i.outdated ? "Abrir" : i.outdated ? "Descargar" : "Buscar"}</button>
+          <button class="btn sm" data-update="${i.id}">${i.toolName ? `Abrir ${esc(i.toolName.replace(/:.*$/, ""))}` : i.group === "BIOS" ? "Ver BIOS" : i.source === "windows-update" && i.outdated ? "Abrir" : i.outdated ? "Descargar" : "Buscar"}</button>
         </li>`).join("")}
     </ul>
     <button class="link" data-update="windows-update">Buscar en Windows Update (actualizaciones opcionales)</button>`;
@@ -687,7 +711,7 @@ async function checkDriversOnline() {
 async function openUpdate(id: string) {
   try {
     await api.openUpdate(id);
-    toast(id === "windows-update" ? "Se abrió Windows Update." : "Se abrió la página oficial de descarga.");
+    toast(id === "windows-update" ? "Se abrió Windows Update." : id === "oem-tool" ? `Se abrió ${state.drivers?.oemTool?.installed ? state.drivers.oemTool.name : "la página de descarga"}.` : "Se abrió la página oficial de descarga.");
   } catch (e) {
     toast(errorText(e), true);
   }
@@ -1058,6 +1082,7 @@ document.addEventListener("click", (e) => {
   else if (d.act === "scan") runScan();
   else if (d.act === "drivers-online") checkDriversOnline();
   else if (d.act === "net-test") runNetTest();
+  else if (d.act === "redetect") redetect();
   else if (d.act === "update-install") api.updateInstall();
   else if (d.act === "overlay-toggle") api.overlayToggle().then(loadOverlay).catch((e) => toast(errorText(e), true));
   else if (d.act === "overlay-fps") enableFps();
