@@ -4,6 +4,10 @@ import * as system from "./system.js";
 import * as optimize from "./optimize.js";
 import * as win from "./windows.js";
 import { solve } from "./calc.js";
+import * as cleanup from "./cleanup.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 // El cálculo, con datos inventados: una gráfica justa debe recortar y una sobrada no.
 function checkCalc() {
@@ -38,8 +42,74 @@ function checkCalc() {
   return ok && notUltra;
 }
 
+// Limpieza de basura de actualizaciones, en una carpeta temporal falsa (no toca ningún juego real).
+async function checkCleanup() {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "gc-clean-"));
+  const lib = path.join(root, "steamapps");
+  const game = { id: "steam-111", name: "Prueba", store: "Steam", library: lib, path: path.join(lib, "common", "Prueba") };
+  const put = (f, text = "x".repeat(1000)) => fs.mkdir(path.dirname(f), { recursive: true }).then(() => fs.writeFile(f, text));
+  const manifest = (flags) => put(path.join(lib, "appmanifest_111.acf"), `"AppState"
+{
+	"StateFlags"		"${flags}"
+}`);
+  try {
+    await manifest(4);
+    await put(path.join(game.path, "juego.exe"));
+    await put(path.join(game.path, "saves", "partida.sav"));
+    await put(path.join(game.path, "viejo.tmp")); // reciente: no se toca
+    await put(path.join(lib, "downloading", "111", "parche.bin"), "y".repeat(5000));
+    await put(path.join(lib, "temp", "111", "a.tmp"));
+    await put(path.join(lib, "downloading", "222", "otro-juego.bin")); // de otro juego: no se toca
+    const old = new Date(Date.now() - 10 * 864e5);
+    for (const f of ["downloading/111/parche.bin", "downloading/111", "temp/111/a.tmp"]) await fs.utimes(path.join(lib, f), old, old); // descarga parada hace días
+    await put(path.join(game.path, "data", "descarga.part"));
+    await fs.utimes(path.join(game.path, "data", "descarga.part"), old, old);
+
+    const r = await cleanup.scan(game, { manual: true });
+    const paths = r.items.map((i) => path.relative(root, i.path).split(path.sep).join("/")).sort();
+    const scanOk = !r.blocked && paths.join() === "steamapps/common/Prueba/data/descarga.part,steamapps/downloading/111,steamapps/temp/111";
+    console.log(scanOk ? "ok limpieza: detecta solo la basura de este juego" : "X  limpieza detecta mal", JSON.stringify(paths));
+
+    await manifest(1026); // Steam actualizando: no se ofrece nada
+    const busy = await cleanup.scan(game);
+    const busyOk = busy.blocked && busy.items.length === 0;
+    console.log(busyOk ? "ok limpieza: no toca un juego que se está actualizando" : "X  limpieza toca un juego en actualización");
+    await manifest(4);
+
+    const done = await cleanup.clean(game, r.items);
+    const exists = (f) => fs.access(f).then(() => true, () => false);
+    const kept = (await exists(path.join(game.path, "juego.exe"))) && (await exists(path.join(game.path, "saves", "partida.sav")))
+      && (await exists(path.join(game.path, "viejo.tmp"))) && (await exists(path.join(lib, "downloading", "222", "otro-juego.bin")));
+    const gone = !(await exists(path.join(lib, "downloading", "111"))) && !(await exists(path.join(lib, "temp", "111")));
+    const delOk = kept && gone && done.removed === 3 && done.freed >= 6000;
+    console.log(delOk ? "ok limpieza: borra la basura y respeta el juego, las partidas y otros juegos" : "X  limpieza borra mal", JSON.stringify(done));
+
+    // Una ruta fuera de su carpeta permitida nunca se borra (aunque la regla se equivocara).
+    const outside = path.join(root, "fuera.txt");
+    await put(outside);
+    await cleanup.clean(game, [{ path: outside, bytes: 1, root: lib }, { path: lib, bytes: 1, root: lib }]);
+    const guardOk = (await exists(outside)) && (await exists(lib));
+    console.log(guardOk ? "ok limpieza: rechaza rutas fuera de la carpeta permitida" : "X  limpieza borró fuera de su carpeta");
+    // Roblox: solo se borran versiones antiguas del jugador; la actual y Roblox Studio se quedan.
+    const rb = path.join(root, "Roblox");
+    await put(path.join(rb, "Versions", "version-nueva", "RobloxPlayerBeta.exe"));
+    await put(path.join(rb, "Versions", "version-vieja", "RobloxPlayerBeta.exe"));
+    await put(path.join(rb, "Versions", "version-antigua", "RobloxPlayerBeta.exe"));
+    const older = new Date(Date.now() - 30 * 864e5);
+    await fs.utimes(path.join(rb, "Versions", "version-antigua", "RobloxPlayerBeta.exe"), older, older); // las 2 más recientes se conservan
+    await put(path.join(rb, "Versions", "version-studio", "RobloxStudioBeta.exe"));
+    const rr = await cleanup.scan({ id: "roblox-player", name: "Roblox", store: "Roblox", path: rb, version: "version-nueva" });
+    const rbOk = rr.items.length === 1 && path.basename(rr.items[0].path) === "version-antigua";
+    console.log(rbOk ? "ok limpieza: Roblox borra solo versiones viejas del jugador (no Studio)" : "X  limpieza de Roblox mal", JSON.stringify(rr.items.map((i) => path.basename(i.path))));
+    return scanOk && busyOk && delOk && guardOk && rbOk;
+  } finally {
+    await fs.rm(root, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 app.whenReady().then(async () => {
   let ok = checkCalc();
+  try { ok = (await checkCleanup()) && ok; } catch (e) { ok = false; console.error("FALLO limpieza", e); }
   try {
     console.log("HW", JSON.stringify(await system.hardware()));
     const ws = await win.state(await system.hardware());

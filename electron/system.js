@@ -3,7 +3,7 @@ import { screen } from "electron";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
-import { statfsSync, existsSync } from "node:fs";
+import { statfsSync, statSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { scoreOf, isIntegrated } from "./gpus.js";
@@ -349,6 +349,8 @@ async function steamGames() {
         image: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
         sizeGb: Math.round((Number(get("SizeOnDisk")) / GB) * 10) / 10,
         path: path.join(dir, "common", get("installdir") ?? ""),
+        version: get("buildid") ?? null, // cambia con cada actualización del juego
+        library: dir, // carpeta steamapps donde Steam deja las descargas a medias
       });
     }
   }
@@ -371,6 +373,7 @@ async function epicGames() {
         catalogId: j.CatalogItemId, // para su portada en el catálogo local de Epic
         sizeGb: Math.round((j.InstallSize / GB) * 10) / 10,
         path: j.InstallLocation,
+        version: j.ManifestHash || j.AppVersionString || null, // el manifiesto cambia con cada parche
       });
     } catch { /* manifiesto dañado: se ignora */ }
   }
@@ -463,7 +466,14 @@ async function xboxGames() {
 // Roblox: no tiene tienda, pero sí ajustes de gráficos propios.
 async function robloxGame() {
   const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox");
-  return existsSync(path.join(dir, "Versions")) ? [{ id: "roblox-player", name: "Roblox", store: "Roblox", image: "", sizeGb: null, path: dir }] : [];
+  if (!existsSync(path.join(dir, "Versions"))) return [];
+  // Roblox deja una carpeta por versión en Versions\: la más reciente (con el ejecutable) es la versión actual.
+  const versions = (await fs.readdir(path.join(dir, "Versions")).catch(() => []))
+    .map((v) => ({ v, exe: path.join(dir, "Versions", v, "RobloxPlayerBeta.exe") }))
+    .filter((x) => existsSync(x.exe))
+    .map((x) => ({ ...x, mtime: statSync(x.exe).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  return [{ id: "roblox-player", name: "Roblox", store: "Roblox", image: "", sizeGb: null, path: dir, version: versions[0]?.v ?? null }];
 }
 
 const STORE_ORDER = ["Steam", "Epic", "Riot", "Xbox", "EA", "Ubisoft", "Battle.net", "GOG", "Rockstar", "Roblox"];

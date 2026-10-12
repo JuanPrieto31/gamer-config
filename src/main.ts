@@ -33,6 +33,7 @@ const state = {
   game: null as Game | null,
   detail: null as GameDetail | null,
   goal: (safeGet("goal") as Goal | null) ?? "equilibrado",
+  cleanAuto: true, // borrar solo la basura de las actualizaciones
 };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -392,6 +393,7 @@ const VIEWS: Record<View, () => string> = {
       </header>
       ${games?.length === 0 ? `<div class="empty"><span class="empty-ic">${icon.game}</span><p>No se ha encontrado ningún juego de Steam, Epic o Riot en este PC.</p></div>` : ""}
       ${games?.length ? centralBlock(games) : ""}
+      ${games?.length ? cleanBlock() : ""}
       ${games?.length ? gamesToolbar(games) : ""}
       <div class="games">
         ${games
@@ -555,6 +557,9 @@ function gameDetail(g: Game) {
             <button class="btn primary" data-act="apply-game" ${changes === 0 || state.working ? "disabled" : ""}>
               ${icon.check}<span>${state.working === "game" ? "Aplicando…" : changes === 0 ? "Ya optimizado" : `Aplicar ${changes} ${changes === 1 ? "cambio" : "cambios"}`}</span>
             </button>` : d ? `<span class="tag">Solo guía: ponlo en el menú del juego</span>` : ""}
+          <button class="btn" data-act="clean-game" ${state.working ? "disabled" : ""}>
+            ${icon.check}<span>${state.working === "clean" ? "Limpiando…" : "Liberar espacio"}</span>
+          </button>
         </div>
       </div>
     </header>
@@ -992,6 +997,48 @@ function centralBlock(games: Game[]) {
     </section>`;
 }
 
+function cleanBlock() {
+  return `
+    <section class="block central">
+      <div class="row-main">
+        <h2>Limpieza tras actualizar</h2>
+        <span class="muted">Cuando un juego se actualiza, se borran los archivos sobrantes que deja el parche (descargas a medias, versiones anteriores) para que no crezca de tamaño. Nunca se tocan partidas, ajustes ni mods. También puedes limpiar un juego a mano desde su ficha.</span>
+      </div>
+      <div class="central-actions">
+        <button class="btn ${state.cleanAuto ? "primary" : ""}" data-act="clean-auto" aria-pressed="${state.cleanAuto}">
+          ${icon.check}<span>${state.cleanAuto ? "Automática: activada" : "Automática: apagada"}</span>
+        </button>
+      </div>
+    </section>`;
+}
+
+async function toggleCleanAuto() {
+  try {
+    state.cleanAuto = (await api.cleanSet({ auto: !state.cleanAuto })).auto;
+    toast(state.cleanAuto ? "Se limpiará solo tras cada actualización." : "Ya no se limpia solo: te avisaremos cuando haya archivos sobrantes.");
+  } catch (e) {
+    toast(errorText(e), true);
+  }
+  rerender();
+}
+
+async function cleanGame() {
+  const g = state.game;
+  if (!g || state.working) return;
+  let scan;
+  try { scan = await api.cleanScan(g.id); } catch (e) { return toast(errorText(e), true); }
+  if (scan.blocked) return toast(scan.blocked, true);
+  if (scan.total === 0) return toast(`${g.name} no tiene archivos sobrantes.`);
+  const list = scan.items.map((i) => `${i.why}: ${gb(i.bytes)}`).join(" · ");
+  const ok = await change("clean", `Liberar ${gb(scan.total)} de ${g.name}`,
+    `Se borrarán solo archivos que sobran tras las actualizaciones (${list}). El juego en sí, tus partidas y ajustes no se tocan. No se puede deshacer.`, "Borrar",
+    async () => {
+      const r = await api.cleanRun(g.id);
+      return r.removed ? `Liberados ${gb(r.freed)} de ${g.name}.` : "No se pudo borrar nada (¿el juego o su lanzador están abiertos?).";
+    });
+  if (ok) await refreshGames();
+}
+
 async function applyAll() {
   const goalName = GOALS.find(([v]) => v === state.goal)![1];
   await change("all", `Aplicar «${goalName}» a todos los juegos`,
@@ -1088,6 +1135,8 @@ document.addEventListener("click", (e) => {
   else if (d.act === "overlay-fps") enableFps();
   else if (d.act === "back") { state.game = null; render(); }
   else if (d.act === "apply-game") applyGame();
+  else if (d.act === "clean-game") cleanGame();
+  else if (d.act === "clean-auto") toggleCleanAuto();
   else if (d.act === "restore-game") restoreGame();
   else if (d.act === "copy-report" && state.game) {
     api.copyReport(state.game.id, state.goal).then(
@@ -1183,7 +1232,16 @@ api.onGamesChanged(async (added) => {
   if (state.view === "juegos") rerender();
 });
 
+// Un juego se actualizó: si la limpieza automática está activada ya se borró la basura; si no, se avisa de cuánta hay.
+api.onGamesCleaned((results) => {
+  for (const r of results) {
+    toast(r.freed > 0 ? `${r.name} se actualizó: liberados ${gb(r.freed)} de archivos sobrantes.` : `${r.name} se actualizó y tiene ${gb(r.available)} de archivos sobrantes. Límpialos desde su ficha.`);
+  }
+  refreshGames().then(() => { if (state.view === "juegos") rerender(); }).catch(() => {});
+});
+
 /* ---------- Arranque ---------- */
+api.cleanGet().then((c) => { state.cleanAuto = c.auto; }, () => {});
 
 go("panel");
 api.onUpdateReady(updateBanner);
