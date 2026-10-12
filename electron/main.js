@@ -1,10 +1,16 @@
-import { app, BrowserWindow, Menu, clipboard, ipcMain, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, Menu, Tray, clipboard, ipcMain, nativeTheme, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { watch, statfsSync, existsSync, cpSync } from "node:fs";
 import path from "node:path";
 import * as system from "./system.js";
 import * as win from "./windows.js";
 import * as optimize from "./optimize.js";
+import * as overlay from "./overlay.js";
+import * as gamemode from "./gamemode.js";
+import * as network from "./network.js";
+import updater from "electron-updater";
+
+const { autoUpdater } = updater;
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +31,8 @@ app.setPath("userData", process.argv.includes("--pruebas") ? `${dataDir} (prueba
 if (!app.requestSingleInstanceLock()) app.quit();
 
 Menu.setApplicationMenu(null);
+// Sin aceleración por GPU: la interfaz es sencilla y así la gráfica queda entera para el juego (también el overlay).
+app.disableHardwareAcceleration();
 
 let mainWindow = null;
 
@@ -48,6 +56,15 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  // Al cerrar se destruye la ventana (libera su memoria); la app sigue en segundo plano si así está configurado.
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    if (!overlay.getSettings().background) return app.quit();
+    if (overlay.getSettings().background && !quitting && !backgroundNoticeShown) {
+      backgroundNoticeShown = true;
+      tray?.displayBalloon({ title: "Gamer Config sigue en segundo plano", content: `Pulsa ${overlay.getSettings().hotkey} en el juego para ver las estadísticas. Para salir, usa el icono junto al reloj.` });
+    }
+  });
 
   // Los enlaces externos se abren en el navegador, nunca dentro de la app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -60,7 +77,7 @@ function createWindow() {
 }
 
 app.on("second-instance", () => {
-  if (!mainWindow) return;
+  if (!mainWindow) return createWindow();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.focus();
 });
@@ -73,6 +90,7 @@ async function listGames() {
   const games = await system.games();
   const withStatus = await Promise.all(games.map(async (g) => ({ ...g, status: await optimize.status(g).catch(() => "sin perfil") })));
   knownGames = withStatus;
+  gamemode.setGames(withStatus).catch(() => {});
   return withStatus;
 }
 
@@ -178,12 +196,18 @@ const handlers = {
   // El estado depende del PC: hay optimizaciones que solo se recomiendan si al equipo le viene bien aligerar Windows o le falta disco.
   "win-state": async () => {
     const hw = await system.hardware().catch(() => ({}));
-    const c = statfsSync("C:\\");
-    return win.state({ ...hw, freeGbC: (c.bavail * c.bsize) / 1024 ** 3 });
+    let freeGbC = null;
+    try {
+      const c = statfsSync(`${process.env.SystemDrive ?? "C:"}\\`);
+      freeGbC = (c.bavail * c.bsize) / 1024 ** 3;
+    } catch { /* sin dato de espacio: se omiten las recomendaciones por disco */ }
+    return win.state({ ...hw, freeGbC });
   },
   // Tras cada cambio se vuelve a leer Windows para comprobar que está aplicado de verdad.
   // verified: true (confirmado), false (Windows no lo muestra aplicado), null (no hay nada que comprobar: borrar archivos, etc.).
   "win-action": async (id, arg) => {
+    // Solo programas que de verdad están en la lista de inicio (la interfaz no puede pedir escribir otra clave del registro).
+    if (id === "startup" && !(await system.startupApps()).some((a) => a.id === arg?.id)) throw new Error("Ese programa no está en el inicio de Windows.");
     const msg = await win.action(id, arg);
     let verified = null;
     if (id === "startup") {
@@ -196,9 +220,27 @@ const handlers = {
     }
     return { msg, verified };
   },
+  // Estadísticas en el juego.
+  "overlay-get": async () => ({ settings: overlay.getSettings(), visible: overlay.isVisible(), fpsReady: await overlay.checkFps(), hotkeyOk: hotkeyOk }),
+  "overlay-set": (patch) => {
+    const s = overlay.setSettings(patch);
+    hotkeyOk = overlay.registerHotkey();
+    return s;
+  },
+  "overlay-toggle": () => overlay.toggle(),
+  "overlay-fps": () => overlay.enableFps(),
+  // Modo juego automático.
+  "gamemode-get": () => ({ settings: gamemode.getSettings(), ...gamemode.status() }),
+  "gamemode-set": (patch) => gamemode.setSettings(patch),
+  "gamemode-apps": () => gamemode.openApps(),
+  // Prueba de conexión.
+  "net-test": () => network.test(),
+  // Actualización de la app.
+  "update-status": () => updateReady,
+  "update-install": () => { quitting = true; autoUpdater.quitAndInstall(); },
   history: () => win.history(),
   undo: (id) => win.undo(id),
-  drivers: () => system.drivers(),
+  drivers: (online) => system.drivers({ online: online === true }),
   // Solo abre páginas que salen de la lista de drivers (nunca una dirección que mande la interfaz).
   "open-update": async (id) => {
     const d = await system.drivers();
@@ -209,10 +251,70 @@ const handlers = {
 
 for (const [ch, fn] of Object.entries(handlers)) ipcMain.handle(ch, (_e, ...args) => fn(...args));
 
+/* ---------- Actualizaciones (desde las versiones publicadas en GitHub) ---------- */
+
+let updateReady = null;
+function checkUpdates() {
+  if (!app.isPackaged) return; // en desarrollo no hay nada que actualizar
+  // Se descarga sola en segundo plano y se instala al salir de la app (o al pulsar «Reiniciar y actualizar»).
+  autoUpdater.on("update-downloaded", (info) => {
+    updateReady = info.version;
+    tray?.displayBalloon({ title: `Gamer Config ${info.version} lista`, content: "Se instalará al cerrar la app. También puedes instalarla ya desde el icono junto al reloj." });
+    mainWindow?.webContents.send("update-ready", info.version);
+  });
+  autoUpdater.on("error", () => {}); // sin internet o sin versión nueva: se reintenta más tarde
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, 6 * 3600 * 1000);
+}
+
+/* ---------- Segundo plano ---------- */
+
+let tray = null;
+let quitting = false;
+let backgroundNoticeShown = false;
+let hotkeyOk = false;
+
+function createTray() {
+  tray = new Tray(path.join(dir, "../build/icon.png"));
+  tray.setToolTip("Gamer Config");
+  const menu = () => Menu.buildFromTemplate([
+    { label: "Abrir Gamer Config", click: () => (mainWindow ? mainWindow.show() : createWindow()) },
+    { label: `Estadísticas en el juego (${overlay.getSettings().hotkey})`, type: "checkbox", checked: overlay.isVisible(), click: () => overlay.toggle() },
+    ...(updateReady ? [{ label: `Reiniciar y actualizar a la ${updateReady}`, click: () => { quitting = true; autoUpdater.quitAndInstall(); } }] : []),
+    { type: "separator" },
+    { label: "Salir", click: () => { quitting = true; app.quit(); } },
+  ]);
+  tray.on("click", () => (mainWindow ? mainWindow.show() : createWindow()));
+  tray.on("right-click", () => tray.popUpContextMenu(menu()));
+}
+
 app.whenReady().then(() => {
   system.specs().catch(() => {}); // precarga: la consulta de hardware tarda ~2 s
+  createTray();
+  hotkeyOk = overlay.registerHotkey();
+  gamemode.init({
+    notify: (title, content) => tray?.displayBalloon({ title, content }),
+    overlay: (on) => (on ? overlay.show() : overlay.hide()),
+  });
+  checkUpdates();
   optimize.updateProfiles().catch(() => {});
   createWindow();
   listGames().then(watchGames).catch(() => {});
+  // Drivers: se comprueban en internet en segundo plano al abrir la app (y cada 6 h si sigue abierta),
+  // así la pestaña y el análisis ya tienen el resultado. Se espera un poco para no frenar el arranque.
+  const checkDrivers = () => system.drivers({ online: true }).catch(() => {});
+  setTimeout(checkDrivers, 8000);
+  setInterval(checkDrivers, 6 * 3600 * 1000);
 });
-app.on("window-all-closed", () => app.quit());
+// La ventana de estadísticas no cuenta: si solo queda ella (o ninguna) y no está activado el segundo plano, se sale.
+app.on("window-all-closed", () => { if (!overlay.getSettings().background || quitting) app.quit(); });
+// Si se sale con un juego abierto, antes se deja todo como estaba (plan de energía y programas cerrados).
+let restored = false;
+app.on("before-quit", (e) => {
+  quitting = true;
+  if (restored || !gamemode.status().active) return;
+  e.preventDefault();
+  gamemode.shutdown().finally(() => { restored = true; app.quit(); });
+});
+app.on("will-quit", () => overlay.hide());

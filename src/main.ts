@@ -2,9 +2,9 @@ import "./style.css";
 import { icon } from "./icons";
 import { friendlyName, describe, isVideoSetting } from "./names";
 import { api, errorText } from "./api";
-import type { ActionResult, ApplyResult, DriverInfo, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
+import type { GameModeSettings, GameModeState, NetResult, OpenApp, ActionResult, ApplyResult, DriverInfo, DriverItem, OverlayMetric, OverlaySettings, OverlayState, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
 
-type View = "panel" | "sistema" | "juegos";
+type View = "panel" | "sistema" | "juegos" | "juego";
 
 const state = {
   view: "panel" as View,
@@ -16,7 +16,15 @@ const state = {
   startup: null as StartupApp[] | null,
   win: null as WinState | null,
   drivers: null as DriverInfo | null,
-  winTab: (safeGet("winTab") ?? "opts") as "opts" | "drivers" | "startup" | "history",
+  driversChecking: false,
+  overlay: null as OverlayState | null,
+  driversAutoTried: false, // la comprobación automática se intenta una vez por sesión (si falla, queda el botón)
+  winTab: (safeGet("winTab") ?? "opts") as "opts" | "drivers" | "startup" | "net" | "history",
+  gamemode: null as GameModeState | null,
+  openApps: null as OpenApp[] | null,
+  net: null as NetResult | null,
+  netRunning: false,
+  updateReady: null as string | null,
   gameTab: "rec" as GameTab,
   gameQuery: "",
   gameFilter: "todos" as "todos" | Game["status"],
@@ -40,6 +48,7 @@ const NAV: [View, string, string][] = [
   ["panel", "Resumen", icon.gauge],
   ["sistema", "Windows", icon.cpu],
   ["juegos", "Juegos", icon.game],
+  ["juego", "En juego", icon.chart],
 ];
 
 $("#app").innerHTML = `
@@ -59,6 +68,7 @@ function go(v: View) {
   render();
   $("#view").focus({ preventScroll: true });
   if (v === "sistema") loadWindows();
+  if (v === "juego") loadOverlay();
 }
 
 function render() {
@@ -77,7 +87,180 @@ function rerender() {
 
 /* ---------- Vistas ---------- */
 
+/* ---------- Estadísticas en el juego ---------- */
+
+const OV_METRICS: [OverlayMetric, string][] = [
+  ["fps", "FPS"], ["low1", "1 % más bajo"], ["frametime", "Tiempo por fotograma"], ["gpu", "Uso de la gráfica"], ["gpuTemp", "Temperatura de la gráfica"],
+  ["vram", "Memoria de vídeo"], ["gpuClock", "Frecuencia de la gráfica"], ["gpuPower", "Consumo de la gráfica"], ["cpu", "Uso del procesador"], ["ram", "Memoria RAM"],
+];
+const OV_SAMPLE: Record<OverlayMetric, [string, string]> = {
+  fps: ["FPS", "144"], low1: ["1% bajo", "98"], frametime: ["ms/frame", "6.9"], gpu: ["GPU", "87%"], gpuTemp: ["GPU °C", "68°"],
+  vram: ["VRAM", "4.2/6 GB"], gpuClock: ["GPU MHz", "1755"], gpuPower: ["GPU W", "72"], cpu: ["CPU", "41%"], ram: ["RAM", "9.8/16 GB"],
+};
+const OV_POS: [OverlaySettings["position"], string][] = [["tl", "Arriba izq."], ["tr", "Arriba der."], ["bl", "Abajo izq."], ["br", "Abajo der."]];
+const OV_SIZE: [OverlaySettings["size"], string][] = [["s", "Pequeño"], ["m", "Mediano"], ["l", "Grande"]];
+const OV_KEYS = ["Alt+Shift+O", "Ctrl+Shift+F10", "Alt+F12", "Ctrl+Alt+S"];
+
+async function loadOverlay() {
+  [state.overlay, state.gamemode, state.openApps] = await Promise.all([api.overlayGet().catch(() => null), api.gamemodeGet().catch(() => null), api.gamemodeApps().catch(() => [])]);
+  if (state.view === "juego") rerender();
+}
+
+function overlayView() {
+  const o = state.overlay;
+  if (!o) return `<header class="head"><div><h1>Estadísticas en el juego</h1></div></header><div class="sk-list">${skel(4)}</div>`;
+  const s = o.settings;
+  const seg = (name: string, opts: [string, string][], cur: string) =>
+    `<fieldset class="seg" aria-label="${name}">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${v}" ${cur === v ? "checked" : ""} /><span>${l}</span></label>`).join("")}</fieldset>`;
+  return `
+    <header class="head">
+      <div>
+        <h1>Estadísticas en el juego</h1>
+        <p class="muted">Pulsa <kbd>${esc(s.hotkey)}</kbd> dentro del juego para mostrarlas u ocultarlas. Solo miden mientras se ven: ocultas no gastan nada.</p>
+      </div>
+      <button class="btn ${o.visible ? "" : "primary"}" data-act="overlay-toggle">${o.visible ? "Ocultar" : "Mostrar ahora"}</button>
+    </header>
+    ${o.hotkeyOk ? "" : `<p class="notice warn">Otro programa ya usa ${esc(s.hotkey)}. Elige otro atajo abajo.</p>`}
+    ${o.fpsReady ? "" : `
+      <section class="block ov-perm">
+        <div>
+          <h2>Activar la medición de FPS</h2>
+          <p class="muted">Para contar los fotogramas, Windows exige un permiso: añadir tu usuario al grupo «Usuarios del registro de rendimiento». Se hace una vez (pide permiso de administrador) y luego hay que cerrar sesión o reiniciar. Se puede deshacer desde el historial. El resto de estadísticas funciona sin esto.</p>
+        </div>
+        <button class="btn primary" data-act="overlay-fps">Activar FPS</button>
+      </section>`}
+    ${gameModeBlock()}
+    <div class="ov-layout">
+      <section class="block">
+        <h2>Qué mostrar</h2>
+        <div class="chips ov-metrics">
+          ${OV_METRICS.map(([k, l]) => `<label class="chip ${s.metrics[k] ? "on" : ""}"><input type="checkbox" data-ov-metric="${k}" ${s.metrics[k] ? "checked" : ""} />${l}</label>`).join("")}
+        </div>
+        <h2>Posición</h2>${seg("ov-position", OV_POS, s.position)}
+        <h2>Tamaño</h2>${seg("ov-size", OV_SIZE, s.size)}
+        <h2>Fondo</h2>
+        <label class="ov-range"><input type="range" min="0" max="0.9" step="0.05" value="${s.opacity}" data-ov-opacity aria-label="Opacidad del fondo" /><span>${Math.round(s.opacity * 100)} %</span></label>
+        <h2>Atajo de teclado</h2>
+        <select data-ov-hotkey aria-label="Atajo de teclado">${OV_KEYS.map((k) => `<option ${k === s.hotkey ? "selected" : ""}>${k}</option>`).join("")}</select>
+        <label class="ov-check"><input type="checkbox" data-ov-background ${s.background ? "checked" : ""} /> Al cerrar la ventana, seguir en segundo plano (icono junto al reloj) para que el atajo funcione</label>
+      </section>
+      <section class="block">
+        <h2>Vista previa</h2>
+        <div class="ov-screen ov-${s.position}">
+          <div class="ov-box ov-${s.size}" style="background: rgba(10,10,12,${s.opacity})">
+            ${OV_METRICS.filter(([k]) => s.metrics[k]).map(([k]) => `<span class="k">${OV_SAMPLE[k][0]}</span><span class="v">${OV_SAMPLE[k][1]}</span>`).join("")}
+          </div>
+        </div>
+        <ul class="ov-notes muted small">
+          <li>Se ve encima del juego en «pantalla completa sin bordes» o en ventana. En pantalla completa exclusiva Windows no deja dibujar encima.</li>
+          <li>No toca el juego: no inyecta nada, así que es seguro con los antitrampas (Vanguard, Easy Anti-Cheat…).</li>
+          <li>La temperatura del procesador no se muestra: Windows no la da sin instalar un driver especial, y eso sí podría dar problemas con los antitrampas.</li>
+          <li>Temperatura, frecuencia y consumo de la gráfica: solo en NVIDIA. En AMD e Intel se muestra el uso.</li>
+        </ul>
+      </section>
+    </div>`;
+}
+
+function gameModeBlock() {
+  const g = state.gamemode;
+  if (!g) return "";
+  const s = g.settings;
+  // Programas abiertos ahora + los ya elegidos aunque no estén abiertos.
+  const apps = new Map((state.openApps ?? []).map((a) => [a.exe, a.title]));
+  for (const exe of s.closeApps) if (!apps.has(exe)) apps.set(exe, exe.replace(/\.exe$/i, ""));
+  return `
+    <section class="block gm">
+      <div class="gm-head">
+        <div>
+          <h2>Modo juego automático</h2>
+          <p class="muted small">Al abrir cualquiera de tus juegos se activa solo, y al cerrarlo deja todo como estaba. Solo mira qué programas se abren cada 5 segundos: no gasta nada.</p>
+        </div>
+        <label class="switch"><input type="checkbox" data-gm="enabled" ${s.enabled ? "checked" : ""} aria-label="Activar el modo juego automático" /><span></span></label>
+      </div>
+      ${g.active ? `<p class="gm-active">Activo ahora: ${esc(g.active)}</p>` : ""}
+      <div class="gm-opts ${s.enabled ? "" : "off"}">
+        <label class="ov-check"><input type="checkbox" data-gm="power" ${s.power ? "checked" : ""} /> Poner el plan de energía de máximo rendimiento mientras juegas</label>
+        <label class="ov-check"><input type="checkbox" data-gm="overlay" ${s.overlay ? "checked" : ""} /> Mostrar las estadísticas al empezar a jugar</label>
+        <h3>Cerrar mientras juegas</h3>
+        <div class="chips">
+          ${apps.size ? [...apps].map(([exe, title]) => `<label class="chip ${s.closeApps.includes(exe) ? "on" : ""}"><input type="checkbox" data-gm-app="${esc(exe)}" ${s.closeApps.includes(exe) ? "checked" : ""} />${esc(title)}</label>`).join("") : `<span class="muted small">Abre los programas que quieras cerrar al jugar (Discord, navegador…) y vuelve aquí.</span>`}
+        </div>
+        <label class="ov-check"><input type="checkbox" data-gm="reopen" ${s.reopen ? "checked" : ""} /> Volver a abrirlos al cerrar el juego</label>
+      </div>
+    </section>`;
+}
+
+async function gameModeSet(patch: Partial<GameModeSettings>) {
+  try {
+    await api.gamemodeSet(patch);
+    state.gamemode = await api.gamemodeGet();
+  } catch (e) {
+    toast(errorText(e), true);
+  }
+  rerender();
+}
+
+/* ---------- Prueba de conexión ---------- */
+
+function netPanel() {
+  const n = state.net;
+  const lvl = (v: number | null, warn: number, bad: number) => (v == null ? "warn" : v >= bad ? "warn" : v >= warn ? "" : "ok");
+  return `
+    <div class="table-head">
+      <h2>Prueba de conexión</h2>
+      <button class="btn ${n ? "" : "primary"}" data-act="net-test" ${state.netRunning ? "disabled" : ""}>${state.netRunning ? "Probando… (10 s)" : n ? "Repetir" : "Probar conexión"}</button>
+    </div>
+    <p class="muted small">Mide el retraso hasta tu router, hasta internet y hasta zonas donde se alojan muchos juegos. Sirve para saber si el lag es de tu PC, de tu Wi-Fi o de tu proveedor.</p>
+    ${state.netRunning && !n ? `<div class="sk-list">${skel(4)}</div>` : ""}
+    ${n ? `
+      <ul class="net-verdict">${n.verdict.map((v) => `<li class="${v.level}">${esc(v.text)}</li>`).join("")}</ul>
+      ${n.adapter ? `<p class="muted small">Conexión: ${n.adapter.wifi ? "Wi-Fi" : "cable"} · ${esc(n.adapter.name)} · ${esc(n.adapter.speed ?? "")}</p>` : ""}
+      <ul class="rows">
+        ${n.rows.map((r) => `
+          <li class="row">
+            <div class="row-main"><strong>${esc(r.name)}</strong><span class="muted small">variación ±${r.jitter ?? "—"} ms · pérdida ${r.loss} %</span></div>
+            <span class="tag ${r.loss > 0 ? "warn" : lvl(r.avg, 80, 150)}">${r.avg == null ? "Sin respuesta" : `${r.avg} ms`}</span>
+          </li>`).join("")}
+      </ul>` : ""}`;
+}
+
+async function runNetTest() {
+  if (state.netRunning) return;
+  state.netRunning = true;
+  rerender();
+  state.net = await api.netTest().catch((e) => { toast(errorText(e), true); return state.net; });
+  state.netRunning = false;
+  rerender();
+}
+
+// Aviso de versión nueva descargada.
+function updateBanner(version: string) {
+  state.updateReady = version;
+  document.querySelector(".update-banner")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `<div class="update-banner" role="status">Gamer Config ${esc(version)} está lista. <button class="btn sm primary" data-act="update-install">Reiniciar y actualizar</button></div>`);
+}
+
+// Cambio de permisos en Windows: pasa por la misma confirmación e historial que el resto.
+async function enableFps() {
+  const ok = await change("overlay-fps", "Activar la medición de FPS",
+    "Se añade tu usuario al grupo «Usuarios del registro de rendimiento» de Windows, que permite leer los fotogramas que muestra cada juego. Después hay que cerrar sesión o reiniciar una vez.",
+    "Activar", () => api.overlayFps(), { admin: true, undoable: true });
+  if (ok) loadOverlay();
+}
+
+async function overlaySet(patch: Partial<OverlaySettings>) {
+  if (!state.overlay) return;
+  try {
+    state.overlay.settings = await api.overlaySet(patch);
+    state.overlay = await api.overlayGet();
+  } catch (e) {
+    toast(errorText(e), true);
+  }
+  rerender();
+}
+
 const VIEWS: Record<View, () => string> = {
+  juego: overlayView,
   panel() {
     const s = state.specs;
     const u = state.usage;
@@ -143,8 +326,9 @@ const VIEWS: Record<View, () => string> = {
 
       ${tabBar("win", [
         ["opts", "Optimizaciones", w ? `${w.items.filter((i) => i.done).length}/${w.items.length}` : ""],
-        ["drivers", "Drivers y BIOS", state.drivers ? (state.drivers.items.some((i) => i.outdated) ? `${state.drivers.items.filter((i) => i.outdated).length} antiguos` : "al día") : ""],
+        ["drivers", "Drivers y BIOS", state.drivers && !driversPending() ? (state.drivers.items.some((i) => i.outdated) ? `${state.drivers.items.filter((i) => i.outdated).length} por actualizar` : "al día") : ""],
         ["startup", "Inicio de Windows", apps ? `${apps.filter((a) => a.enabled).length}/${apps.length}` : ""],
+        ["net", "Conexión", state.net ? (state.net.verdict.some((v) => v.level === "bad") ? "revisar" : "bien") : ""],
         ["history", "Historial", state.history ? String(state.history.length) : ""],
       ], state.winTab)}
 
@@ -155,6 +339,7 @@ const VIEWS: Record<View, () => string> = {
             ${state.drivers ? `<span class="muted">${esc(state.drivers.pc)}</span>` : ""}
           </div>
           ${driversList()}`
+        : state.winTab === "net" ? netPanel()
         : state.winTab === "startup" ? `
           <h2>Programas que se inician con Windows</h2>
           ${!apps ? `<div class="sk-list">${skel(5)}</div>`
@@ -446,21 +631,57 @@ function driversList() {
   const d = state.drivers;
   if (!d) return `<div class="sk-list">${skel(4)}</div>`;
   const old = d.items.filter((i) => i.outdated).length;
+  const online = d.checked.windowsUpdate || d.checked.nvidia;
   return `
-    <p class="count">${old === 0 ? "Todo al día" : `${old} ${old === 1 ? "antiguo" : "antiguos"}`}</p>
+    <p class="count">${driversPending() ? "Comprobando…" : old === 0 ? "Todo al día" : `${old} por actualizar`}</p>
+    <p class="muted small drivers-source">${state.driversChecking ? "Comprobando en internet con Windows Update y NVIDIA…"
+      : online ? `Comprobado en internet${d.checked.windowsUpdate ? " con Windows Update" : ""}${d.checked.nvidia ? `${d.checked.windowsUpdate ? " y" : " con"} NVIDIA` : ""}.`
+      : `Sin conexión: se estima por la fecha de cada driver. <button class="link" data-act="drivers-online">Comprobar en internet</button>`}</p>
     <ul class="rows">
       ${d.items.map((i) => `
         <li class="row">
           <div class="row-main">
             <strong>${esc(i.group)}</strong>
             <span class="muted" title="${esc(i.name)}">${esc(shorten(i.name))} · ${esc(i.version)}${i.date ? ` · ${new Date(i.date).toLocaleDateString("es", { month: "short", year: "numeric" })}` : ""}</span>
+            <span class="muted small">${driversPending() && i.source === "antigüedad" ? "Comprobando en internet…" : driverSource(i)}</span>
             ${i.outdated && i.note ? `<span class="muted small">${esc(i.note)}</span>` : ""}
           </div>
-          <span class="tag ${i.outdated ? "warn" : "ok"}">${i.ageMonths == null ? "Sin fecha" : i.outdated ? `${i.ageMonths} meses` : "Al día"}</span>
-          <button class="btn sm" data-update="${i.id}">${i.group === "BIOS" ? "Ver BIOS" : "Buscar"}</button>
+          ${driversPending() && i.source === "antigüedad" ? `<span class="tag">Comprobando…</span>` : `<span class="tag ${i.outdated ? "warn" : "ok"}">${driverTag(i)}</span>`}
+          <button class="btn sm" data-update="${i.id}">${i.group === "BIOS" ? "Ver BIOS" : i.source === "windows-update" && i.outdated ? "Abrir" : i.outdated ? "Descargar" : "Buscar"}</button>
         </li>`).join("")}
     </ul>
     <button class="link" data-update="windows-update">Buscar en Windows Update (actualizaciones opcionales)</button>`;
+}
+
+// Aún sin respuesta de internet: no se da un «al día» provisional que luego cambie.
+function driversPending() {
+  return Boolean(state.drivers && !state.drivers.checked.windowsUpdate && (state.driversChecking || !state.driversAutoTried));
+}
+
+function driverTag(i: DriverItem) {
+  if (!i.outdated) return "Al día";
+  if (i.source === "nvidia" && i.latest) return `Hay ${esc(i.latest)}`;
+  if (i.source === "windows-update") return "Actualización disponible";
+  return i.ageMonths == null ? "Sin fecha" : `${i.ageMonths} meses`;
+}
+
+// De dónde sale el «al día» o el «por actualizar» de cada driver.
+function driverSource(i: DriverItem) {
+  if (i.source === "nvidia") return i.outdated ? `NVIDIA ya publicó la ${esc(i.latest ?? "")}.` : "Comprobado con NVIDIA: es la última versión.";
+  if (i.source === "windows-update") return i.outdated ? (i.latest ? `Windows Update ofrece: ${esc(shorten(i.latest))}` : "Pendiente en Windows Update.") : "Windows Update no tiene nada más nuevo.";
+  return i.group === "BIOS" ? "Estimado por fecha: compruébalo en la página del fabricante." : "Estimado por fecha (sin comprobar en internet).";
+}
+
+// Pregunta a Windows Update y a NVIDIA. Tarda unos segundos; mientras, se ve la estimación por fecha.
+async function checkDriversOnline() {
+  if (state.driversChecking) return;
+  state.driversChecking = true;
+  rerender();
+  const d = await api.drivers(true).catch(() => null);
+  state.driversChecking = false;
+  if (d) state.drivers = d;
+  if (d && !d.checked.windowsUpdate && !d.checked.nvidia) toast("No se pudo comprobar en internet. Se muestra la estimación por fecha.", true);
+  rerender();
 }
 
 async function openUpdate(id: string) {
@@ -659,6 +880,11 @@ async function undo(id: number) {
 async function refreshWindows() {
   const [w, h, s, d] = await Promise.all([api.winState(), api.history(), api.startup(), api.drivers()].map((p) => p.catch(() => null)));
   if (d) state.drivers = d as DriverInfo;
+  // La primera vez se comprueba en internet solo (luego queda guardado 6 horas).
+  if (state.drivers && !state.drivers.checked.windowsUpdate && !state.driversAutoTried) {
+    state.driversAutoTried = true;
+    checkDriversOnline();
+  }
   if (w) state.win = w as WinState;
   if (h) state.history = h as HistoryEntry[];
   if (s) state.startup = s as StartupApp[];
@@ -830,6 +1056,11 @@ document.addEventListener("click", (e) => {
   else if (d.filterGame) { state.gameFilter = d.filterGame as typeof state.gameFilter; rerender(); }
   else if (d.save != null) saveEdits(Number(d.save));
   else if (d.act === "scan") runScan();
+  else if (d.act === "drivers-online") checkDriversOnline();
+  else if (d.act === "net-test") runNetTest();
+  else if (d.act === "update-install") api.updateInstall();
+  else if (d.act === "overlay-toggle") api.overlayToggle().then(loadOverlay).catch((e) => toast(errorText(e), true));
+  else if (d.act === "overlay-fps") enableFps();
   else if (d.act === "back") { state.game = null; render(); }
   else if (d.act === "apply-game") applyGame();
   else if (d.act === "restore-game") restoreGame();
@@ -888,6 +1119,19 @@ function noteEdit(t: HTMLInputElement | HTMLSelectElement) {
 document.addEventListener("change", (e) => {
   const t = e.target as HTMLInputElement;
   if (t.dataset.edit) { noteEdit(t); return; }
+  if (t.dataset.gm) { gameModeSet({ [t.dataset.gm]: t.checked }); return; }
+  if (t.dataset.gmApp) {
+    const cur = new Set(state.gamemode?.settings.closeApps ?? []);
+    if (t.checked) cur.add(t.dataset.gmApp); else cur.delete(t.dataset.gmApp);
+    gameModeSet({ closeApps: [...cur] });
+    return;
+  }
+  if (t.dataset.ovMetric) { overlaySet({ metrics: { [t.dataset.ovMetric]: t.checked } as OverlaySettings["metrics"] }); return; }
+  if (t.name === "ov-position") { overlaySet({ position: t.value as OverlaySettings["position"] }); return; }
+  if (t.name === "ov-size") { overlaySet({ size: t.value as OverlaySettings["size"] }); return; }
+  if (t.dataset.ovOpacity != null) { overlaySet({ opacity: Number(t.value) }); return; }
+  if (t.dataset.ovHotkey != null) { overlaySet({ hotkey: (t as unknown as HTMLSelectElement).value }); return; }
+  if (t.dataset.ovBackground != null) { overlaySet({ background: t.checked }); return; }
   if (t.name === "goal") {
     state.goal = t.value as Goal;
     safeSet("goal", state.goal);
@@ -917,6 +1161,8 @@ api.onGamesChanged(async (added) => {
 /* ---------- Arranque ---------- */
 
 go("panel");
+api.onUpdateReady(updateBanner);
+api.updateStatus().then((v) => v && updateBanner(v)).catch(() => {});
 
 const failed = (what: string) => () => toast(`No se pudo leer ${what}.`, true);
 api.specs().then((s) => { state.specs = s; if (state.view !== "juegos") rerender(); }, failed("el hardware"));

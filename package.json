@@ -2,7 +2,7 @@
   "name": "gamer-config",
   "productName": "Gamer Config",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -13,11 +13,11 @@
     "instalador": "npm run build && electron-builder --win nsis"
   },
   "devDependencies": {
+    "@phosphor-icons/core": "^2.1.1",
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3",
     "typescript": "^5.9.3",
-    "vite": "^6.4.4",
-    "@phosphor-icons/core": "^2.1.1"
+    "vite": "^6.4.4"
   },
   "allowScripts": {
     "electron@44.7.0": true
@@ -34,7 +34,11 @@
       "!electron/selftest.js",
       "profiles/**",
       "build/icon.png",
+      "vendor/**",
       "package.json"
+    ],
+    "asarUnpack": [
+      "vendor/**"
     ],
     "win": {
       "target": [
@@ -50,10 +54,20 @@
       "shortcutName": "Gamer Config",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "Gamer Config Setup ${version}.${ext}"
+      "artifactName": "Gamer-Config-Setup-${version}.${ext}"
     },
-    "electronDist": "node_modules/electron/dist"
+    "electronDist": "node_modules/electron/dist",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JuanPrieto31",
+        "repo": "gamer-config"
+      }
+    ]
   },
   "description": "Optimiza Windows y tus juegos según tu PC",
-  "author": "Juan Andres Prieto"
+  "author": "Juan Andres Prieto",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
 }

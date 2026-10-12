@@ -22,7 +22,7 @@ async function regRead(key, name) {
 }
 
 // Ejecuta un script de PowerShell como administrador: Windows muestra su aviso de permiso (UAC).
-async function elevated(script) {
+export async function elevated(script) {
   const encoded = Buffer.from(`$ErrorActionPreference='Stop';${script}`, "utf16le").toString("base64");
   const outer = `try { $p = Start-Process powershell -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-EncodedCommand','${encoded}'; exit $p.ExitCode } catch { exit 1223 }`;
   try {
@@ -84,6 +84,7 @@ export async function undo(id) {
   else if (u.type === "hibernate") await elevated("powercfg /hibernate on; exit $LASTEXITCODE");
   else if (u.type === "power") await run("powercfg", ["/setactive", u.guid], opts);
   else if (u.type === "file") await fs.copyFile(u.backup, u.path);
+  else if (u.type === "group") await elevated(`Remove-LocalGroupMember -SID '${u.sid}' -Member '${String(u.user).replace(/'/g, "''")}' -ErrorAction SilentlyContinue; exit 0`);
   entry.undone = true;
   await saveHistory(list);
   return `Deshecho: ${entry.label}`;
@@ -327,6 +328,23 @@ export async function state(hw = {}) {
   return { low, lowReasons, items };
 }
 
+/* ---------- Plan de energía (también lo usa el modo juego) ---------- */
+
+export async function setPerformancePlan() {
+  const plans = await powerPlans();
+  const prev = plans.find((p) => p.active);
+  let target = plans.find((p) => /máximo|ultimate/i.test(p.name)) ?? plans.find((p) => p.guid === HIGH_PERF) ?? plans.find((p) => isPerfPlan(p.name));
+  if (!target) {
+    // El plan existe en todos los Windows aunque esté oculto: se crea una copia visible.
+    const { stdout } = await run("powercfg", ["-duplicatescheme", HIGH_PERF], opts);
+    target = { guid: stdout.match(/[0-9a-f-]{36}/i)[0], name: "Alto rendimiento" };
+  }
+  await run("powercfg", ["/setactive", target.guid], opts);
+  return { prev, target };
+}
+
+export const setPlan = (guid) => run("powercfg", ["/setactive", guid], opts);
+
 /* ---------- Acciones ---------- */
 
 export async function action(id, arg) {
@@ -341,15 +359,7 @@ export async function action(id, arg) {
 
   switch (id) {
     case "power": {
-      const plans = await powerPlans();
-      const prev = plans.find((p) => p.active);
-      let target = plans.find((p) => /máximo|ultimate/i.test(p.name)) ?? plans.find((p) => p.guid === HIGH_PERF) ?? plans.find((p) => isPerfPlan(p.name));
-      if (!target) {
-        // El plan existe en todos los Windows aunque esté oculto: se crea una copia visible.
-        const { stdout } = await run("powercfg", ["-duplicatescheme", HIGH_PERF], opts);
-        target = { guid: stdout.match(/[0-9a-f-]{36}/i)[0], name: "Alto rendimiento" };
-      }
-      await run("powercfg", ["/setactive", target.guid], opts);
+      const { prev, target } = await setPerformancePlan();
       await record(`Plan de energía: ${prev?.name ?? "?"} → ${target.name}`, prev && { type: "power", guid: prev.guid });
       return `Plan de energía cambiado a «${target.name}».`;
     }
@@ -408,8 +418,14 @@ export async function action(id, arg) {
       const dir = os.tmpdir();
       const before = await folderSize(dir);
       const entries = await fs.readdir(dir).catch(() => []);
+      // Solo lo de hace más de un día: lo reciente puede ser de un instalador o programa abierto ahora mismo.
       // Lo que está en uso no se puede borrar y se salta: es lo esperado.
-      await Promise.all(entries.map((e) => fs.rm(path.join(dir, e), { recursive: true, force: true }).catch(() => {})));
+      const dayAgo = Date.now() - 24 * 3600 * 1000;
+      await Promise.all(entries.map(async (e) => {
+        const p = path.join(dir, e);
+        const st = await fs.stat(p).catch(() => null);
+        if (st && st.mtimeMs < dayAgo) await fs.rm(p, { recursive: true, force: true }).catch(() => {});
+      }));
       const freed = Math.max(0, before - (await folderSize(dir)));
       await record(`Temporales borrados (${gb(freed)})`, null);
       return `Se liberaron ${gb(freed)}.`;

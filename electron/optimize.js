@@ -281,6 +281,18 @@ async function allSettings(game, mainFile, hw, profileSettings) {
  * Cambios a mano desde la app: [{ key, value }] en uno de los archivos del juego.
  * Igual de seguro que el resto: solo archivos del propio juego, con el juego cerrado y copia antes de escribir.
  */
+// Se escribe en un temporal y se sustituye de golpe: si el PC se apaga a mitad, el archivo del juego no queda cortado.
+async function writeAtomic(file, text) {
+  const tmp = `${file}.gamerconfig-tmp`;
+  await fs.writeFile(tmp, text);
+  try {
+    await fs.rename(tmp, file);
+  } catch {
+    await fs.rm(tmp, { force: true });
+    await fs.writeFile(file, text); // p. ej. si el juego lo tiene bloqueado para renombrar
+  }
+}
+
 export async function setValues(game, file, changes) {
   const hw = await hardware();
   const found = await findProfile(game, hw);
@@ -312,7 +324,7 @@ export async function setValues(game, file, changes) {
   if (!existsSync(original)) await fs.writeFile(original, r.text);
   const backup = userDir("backups", `${base}-${Date.now()}${ext}`);
   await fs.writeFile(backup, r.text);
-  await fs.writeFile(file, text);
+  await writeAtomic(file, text);
 
   // Comprobación: se relee el archivo y se mira que cada valor quedó como se pidió.
   const after = await readEntries(file);
@@ -509,7 +521,7 @@ export async function apply(game, goal) {
   const backup = userDir("backups", `${safeId(game.id)}-${Date.now()}${ext}`);
   await fs.writeFile(backup, p.text);
 
-  await fs.writeFile(p.file, text);
+  await writeAtomic(p.file, text);
   const applied = await readApplied();
   applied[game.id] = goal;
   await fs.writeFile(appliedFile(), JSON.stringify(applied));

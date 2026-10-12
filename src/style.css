@@ -464,3 +464,52 @@ dialog[open] { animation: pop 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
   .factors-list li { grid-template-columns: 20px 1fr 1fr; }
   .factors-list li > .muted { grid-column: 2 / -1; }
 }
+
+/* ---------- Estadísticas en el juego ---------- */
+.ov-perm { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.ov-perm p { font-size: 13px; max-width: 70ch; margin-top: 4px; }
+.ov-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ov-layout h2 { margin-top: 18px; margin-bottom: 8px; font-size: 14px; }
+.ov-layout h2:first-child { margin-top: 0; }
+.ov-layout .seg { margin-top: 0; }
+.ov-metrics .chip { cursor: pointer; }
+.ov-metrics input { position: absolute; opacity: 0; pointer-events: none; }
+.ov-metrics .chip:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.ov-range { display: flex; align-items: center; gap: 12px; }
+.ov-range input { width: 220px; accent-color: var(--accent); }
+.ov-range span { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 4ch; }
+.ov-check { display: flex; gap: 8px; align-items: flex-start; margin-top: 18px; font-size: 13px; color: var(--muted); }
+.ov-check input { accent-color: var(--accent); margin-top: 2px; }
+kbd { font: 600 12px/1 Consolas, monospace; padding: 2px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-2); color: var(--text); }
+/* Pantalla de ejemplo: imagen de juego simulada con un degradado oscuro */
+.ov-screen { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r); overflow: hidden; background: radial-gradient(120% 90% at 70% 30%, #3a2a24 0%, #1b1d22 55%, #0d0e10 100%); }
+.ov-box { position: absolute; padding: 6px 9px; border-radius: 7px; display: grid; grid-template-columns: auto auto; column-gap: 12px; font: 600 11px/15px Consolas, monospace; color: #f2f2f0; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
+.ov-box.ov-m { font-size: 12px; line-height: 17px; }
+.ov-box.ov-l { font-size: 14px; line-height: 20px; }
+.ov-box .k { color: #b9b9b4; font-weight: 500; }
+.ov-box .v { text-align: right; }
+.ov-tl .ov-box { top: 10px; left: 10px; } .ov-tr .ov-box { top: 10px; right: 10px; }
+.ov-bl .ov-box { bottom: 10px; left: 10px; } .ov-br .ov-box { bottom: 10px; right: 10px; }
+.ov-notes { margin-top: 14px; padding-left: 18px; display: grid; gap: 6px; }
+@media (max-width: 1100px) { .ov-layout { grid-template-columns: 1fr; } }
+
+/* ---------- Modo juego automático ---------- */
+.gm { margin-bottom: 16px; }
+.gm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.gm-head p { max-width: 70ch; margin-top: 4px; }
+.gm-active { margin-top: 10px; color: var(--ok); font-weight: 600; font-size: 13px; }
+.gm-opts { margin-top: 6px; transition: opacity 0.2s; }
+.gm-opts.off { opacity: 0.5; }
+.gm-opts h3 { font-size: 13px; margin: 16px 0 8px; }
+.gm .chip { cursor: pointer; }
+.gm .chip input { position: absolute; opacity: 0; pointer-events: none; }
+.gm .chip:has(input:focus-visible) { outline: 2px solid var(--accent); }
+
+/* ---------- Prueba de conexión ---------- */
+.net-verdict { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 6px; }
+.net-verdict li { padding: 9px 12px; border-radius: var(--r); background: var(--surface-2); border-left: 3px solid var(--ok); font-size: 13px; }
+.net-verdict li.warn { border-left-color: var(--warn); }
+.net-verdict li.bad { border-left-color: var(--danger); }
+
+/* ---------- Aviso de actualización ---------- */
+.update-banner { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); font-size: 13px; }

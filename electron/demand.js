@@ -22,7 +22,8 @@ async function save() {
 }
 
 const steamApi = (q) => fetch(`https://store.steampowered.com/api/${q}`, { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
-const simple = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Sin acentos ni símbolos, pero conservando letras de cualquier alfabeto (si no, dos títulos en japonés quedarían iguales: "").
+const simple = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 function line(html, re) {
   const text = String(html ?? "").replace(/<br\s*\/?>|<\/li>/gi, "\n").replace(/<[^>]+>/g, "");

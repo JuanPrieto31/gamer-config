@@ -93,12 +93,15 @@ function writeJson(text, key, value) {
   const last = parts.at(-1);
   if (!(last in o)) return null;
   const old = o[last];
+  if (typeof old === "number" && !Number.isFinite(Number(value))) return null; // un texto en un número se guardaría como null
   o[last] = typeof old === "number" ? Number(value) : typeof old === "boolean" ? value === "true" : value;
   const indent = text.match(/\n([ \t]+)"/)?.[1] ?? (text.includes("\n") ? 2 : 0);
   return bom + JSON.stringify(obj, null, indent) + (text.endsWith("\n") ? "\n" : "");
 }
 
-function writeXml(text, key, value) {
+function writeXml(text, key, raw) {
+  // Caracteres reservados escapados (sin tocar entidades que ya lo estén), para que el XML siga siendo válido.
+  const value = String(raw).replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+);)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const named = new RegExp(`(<(\\w+)\\s+name="${esc(key)}"[^>]*>)([^<]*)(<\\/\\2>)`);
   if (named.test(text)) return text.replace(named, (_, a, __, ___, d) => `${a}${value}${d}`);
   const attr = new RegExp(`(<\\w+\\s+(?:name|key|id)="${esc(key)}"\\s+value=")([^"]*)(")`);

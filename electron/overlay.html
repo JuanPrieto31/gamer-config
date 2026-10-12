@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Estadísticas</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+  #box {
+    margin: 0; padding: 6px 9px; border-radius: 7px; font: 600 12px/17px Consolas, "Cascadia Mono", monospace;
+    color: #f2f2f0; text-shadow: 0 1px 2px #000; display: grid; grid-template-columns: auto 1fr; column-gap: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  #box.m { font-size: 14px; line-height: 21px; }
+  #box.l { font-size: 18px; line-height: 27px; }
+  .k { color: #b9b9b4; font-weight: 500; }
+  .v { text-align: right; }
+  .good { color: #8acaa3; } .mid { color: #f0c36a; } .bad { color: #f2877d; }
+  .game { grid-column: 1 / -1; color: #9a9a95; font-weight: 500; font-size: .82em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div id="box"></div>
+<script>
+  // Colores: verde bien, amarillo regular, rojo mal (FPS bajos, temperatura o uso alto).
+  const lvl = (v, warn, bad, inverse) => v == null ? "" : inverse ? (v < bad ? "bad" : v < warn ? "mid" : "good") : (v >= bad ? "bad" : v >= warn ? "mid" : "");
+  const n = (v, unit = "") => (v == null || Number.isNaN(v) ? "—" : `${v}${unit}`);
+  const ROWS = {
+    fps: ["FPS", (d, f) => (f ? n(d.fps) : "sin permiso"), (d) => lvl(d.fps, 60, 30, true)],
+    low1: ["1% bajo", (d) => n(d.low1), (d) => lvl(d.low1, 45, 25, true)],
+    frametime: ["ms/frame", (d) => n(d.frametime), () => ""],
+    gpu: ["GPU", (d) => n(d.gpu, "%"), (d) => lvl(d.gpu, 90, 99)],
+    gpuTemp: ["GPU °C", (d) => n(d.gpuTemp, "°"), (d) => lvl(d.gpuTemp, 78, 86)],
+    vram: ["VRAM", (d) => (d.vramUsed == null ? "—" : `${(d.vramUsed / 1024).toFixed(1)}/${Math.round(d.vramTotal / 1024)} GB`), (d) => lvl(d.vramUsed / d.vramTotal, 0.85, 0.95)],
+    gpuClock: ["GPU MHz", (d) => n(d.gpuClock), () => ""],
+    gpuPower: ["GPU W", (d) => n(d.gpuPower), () => ""],
+    cpu: ["CPU", (d) => n(d.cpu, "%"), (d) => lvl(d.cpu, 85, 95)],
+    ram: ["RAM", (d) => (d.ramUsed == null ? "—" : `${d.ramUsed.toFixed(1)}/${Math.round(d.ramTotal)} GB`), (d) => lvl(d.ramUsed / d.ramTotal, 0.85, 0.93)],
+  };
+  const box = document.getElementById("box");
+  window.paint = ({ s, d, fpsReady }) => {
+    box.className = s.size;
+    box.style.background = `rgba(10, 10, 12, ${s.opacity})`;
+    const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+    box.innerHTML = Object.keys(ROWS).filter((k) => s.metrics[k]).map((k) => {
+      const [label, val, cls] = ROWS[k];
+      return `<span class="k">${label}</span><span class="v ${cls(d)}">${esc(val(d, fpsReady))}</span>`;
+    }).join("") + `<span class="game">${esc(d.game ?? "Gamer Config")}</span>`;
+  };
+</script>
+</body>
+</html>

@@ -63,8 +63,31 @@ export interface DriverItem {
   ageMonths: number | null;
   outdated: boolean;
   note: string | null;
+  latest: string | null; // última versión publicada (NVIDIA) o la actualización que ofrece Windows Update
+  source: "nvidia" | "windows-update" | "antigüedad";
 }
-export interface DriverInfo { pc: string; items: DriverItem[] }
+export interface DriverInfo { pc: string; items: DriverItem[]; checked: { windowsUpdate: boolean; nvidia: boolean } }
+
+export type OverlayMetric = "fps" | "low1" | "frametime" | "gpu" | "gpuTemp" | "vram" | "gpuClock" | "gpuPower" | "cpu" | "ram";
+export interface OverlaySettings {
+  metrics: Record<OverlayMetric, boolean>;
+  position: "tl" | "tr" | "bl" | "br";
+  size: "s" | "m" | "l";
+  opacity: number;
+  hotkey: string;
+  background: boolean;
+}
+export interface OverlayState { settings: OverlaySettings; visible: boolean; fpsReady: boolean; hotkeyOk: boolean }
+
+export interface GameModeSettings { enabled: boolean; power: boolean; closeApps: string[]; reopen: boolean; overlay: boolean }
+export interface GameModeState { settings: GameModeSettings; active: string | null }
+export interface OpenApp { exe: string; title: string }
+export interface NetRow { id: string; name: string; avg: number | null; jitter: number | null; loss: number; min: number | null }
+export interface NetResult {
+  adapter: { name: string; wifi: boolean; speed: string; signal?: number | null } | null;
+  rows: NetRow[];
+  verdict: { level: "ok" | "warn" | "bad"; text: string }[];
+}
 
 export interface WinItem {
   id: string;
@@ -101,13 +124,31 @@ interface Bridge {
   winAction(id: string, arg?: unknown): Promise<ActionResult>;
   history(): Promise<HistoryEntry[]>;
   undo(id: number): Promise<string>;
-  drivers(): Promise<DriverInfo>;
+  drivers(online?: boolean): Promise<DriverInfo>; // online: pregunta a Windows Update y a NVIDIA (~15 s)
   openUpdate(id: string): Promise<void>;
+  overlayGet(): Promise<OverlayState>;
+  overlaySet(patch: Partial<OverlaySettings>): Promise<OverlaySettings>;
+  overlayToggle(): Promise<boolean>;
+  overlayFps(): Promise<string>;
   onGamesChanged(cb: (added: { name: string; status: Game["status"] }[]) => void): void;
+  gamemodeGet(): Promise<GameModeState>;
+  gamemodeSet(patch: Partial<GameModeSettings>): Promise<GameModeSettings>;
+  gamemodeApps(): Promise<OpenApp[]>;
+  netTest(): Promise<NetResult>;
+  updateStatus(): Promise<string | null>;
+  updateInstall(): Promise<void>;
+  onUpdateReady(cb: (version: string) => void): void;
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const steam = (id: number) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`;
+
+const mockOverlay: OverlaySettings = {
+  metrics: { fps: true, low1: true, frametime: false, gpu: true, gpuTemp: true, vram: true, gpuClock: false, gpuPower: false, cpu: true, ram: true },
+  position: "tl", size: "m", opacity: 0.55, hotkey: "Alt+Shift+O", background: true,
+};
+
+const mockGameMode: GameModeSettings = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false };
 
 // Datos de ejemplo para el navegador.
 const mock: Bridge = {
@@ -195,16 +236,43 @@ const mock: Bridge = {
   async winAction() { await wait(900); return { msg: "Hecho (ejemplo).", verified: true }; },
   async history() { return []; },
   async undo() { return "Deshecho (ejemplo)."; },
-  async drivers() {
-    await wait(500);
-    return { pc: "Lenovo LOQ 15IRH8", items: [
-      { id: "bios", group: "BIOS", name: "LENOVO LZCN45WW", version: "LZCN45WW", date: "2026-06-04", ageMonths: 4, outdated: false, note: "Actualízala solo desde la página oficial." },
-      { id: "gpu-1", group: "Gráfica", name: "NVIDIA GeForce RTX 3050 6GB Laptop GPU", version: "617.14", date: "2026-09-16", ageMonths: 0, outdated: false, note: null },
-      { id: "bt", group: "Bluetooth", name: "Realtek Bluetooth Adapter", version: "18.4032", date: "2023-10-09", ageMonths: 36, outdated: true, note: null },
+  async drivers(online) {
+    await wait(online ? 2500 : 500);
+    return { pc: "Lenovo LOQ 15IRH8", checked: { windowsUpdate: !!online, nvidia: !!online }, items: [
+      { id: "bios", group: "BIOS", name: "LENOVO LZCN45WW", version: "LZCN45WW", date: "2026-06-04", ageMonths: 4, outdated: false, note: "Actualízala solo desde la página oficial.", latest: null, source: "antigüedad" },
+      { id: "gpu-1", group: "Gráfica", name: "NVIDIA GeForce RTX 3050 6GB Laptop GPU", version: "617.14", date: "2026-09-16", ageMonths: 0, outdated: !!online, note: null, latest: online ? "617.42" : null, source: online ? "nvidia" : "antigüedad" },
+      { id: "bt", group: "Bluetooth", name: "Realtek Bluetooth Adapter", version: "18.4032", date: "2023-10-09", ageMonths: 36, outdated: !online, note: null, latest: null, source: online ? "windows-update" : "antigüedad" },
     ] };
   },
   async openUpdate() {},
+  async overlayGet() {
+    return { settings: { ...mockOverlay }, visible: false, fpsReady: false, hotkeyOk: true };
+  },
+  async overlaySet(patch) {
+    Object.assign(mockOverlay, patch, { metrics: { ...mockOverlay.metrics, ...patch.metrics } });
+    return { ...mockOverlay };
+  },
+  async overlayToggle() { return true; },
+  async overlayFps() { return "Listo. Cierra sesión en Windows una vez para que se active."; },
   onGamesChanged() {},
+  async gamemodeGet() { return { settings: { ...mockGameMode }, active: null }; },
+  async gamemodeSet(patch) { Object.assign(mockGameMode, patch); return { ...mockGameMode }; },
+  async gamemodeApps() { return [{ exe: "discord.exe", title: "Discord" }, { exe: "msedge.exe", title: "Microsoft Edge" }, { exe: "spotify.exe", title: "Spotify" }]; },
+  async netTest() {
+    await wait(1500);
+    return {
+      adapter: { name: "Realtek PCIe GbE Family Controller", wifi: false, speed: "1 Gbps" },
+      rows: [
+        { id: "router", name: "Tu router (192.168.0.1)", avg: 1, jitter: 0, loss: 0, min: 1 },
+        { id: "internet", name: "Internet (Cloudflare)", avg: 51, jitter: 3.8, loss: 0, min: 48 },
+        { id: "na-east", name: "Norteamérica Este (Virginia)", avg: 63, jitter: 7.3, loss: 0, min: 58 },
+      ],
+      verdict: [{ level: "ok", text: "Tu conexión está bien: si notas lag, no viene de tu red." }],
+    };
+  },
+  async updateStatus() { return null; },
+  async updateInstall() {},
+  onUpdateReady() {},
 };
 
 const bridge = (window as unknown as { afina?: Bridge }).afina;

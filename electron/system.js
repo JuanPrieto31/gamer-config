@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { scoreOf } from "./gpus.js";
 import { cpuScoreOf } from "./cpus.js";
+import { windowsUpdateDrivers, nvidiaLatest, compareVersions } from "./online.js";
 
 const run = promisify(execFile);
 
@@ -29,7 +30,7 @@ let rawCache = null;
 function raw() {
   rawCache ??= ps(`
     $disk = Get-Partition -DriveLetter C | Get-Disk
-    $vram = Get-ItemProperty 'HKLM:\\SYSTEM\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0*' |
+    $vram = Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0*' |
       Select-Object DriverDesc, @{n='Mem';e={[int64]$_.'HardwareInformation.qwMemorySize'}}
     $cv = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
     [pscustomobject]@{
@@ -59,7 +60,8 @@ const RAM_TYPES = { 24: "DDR3", 26: "DDR4", 34: "DDR5" };
 
 function mainGpu(r) {
   const gpus = arr(r.gpus);
-  return gpus.find((g) => /nvidia|radeon|arc/i.test(g.Name)) ?? gpus[0] ?? { Name: "Desconocida" };
+  // La más potente: en portátiles con Ryzen la integrada "AMD Radeon Graphics" puede salir antes que la NVIDIA.
+  return gpus.reduce((best, g) => (!best || scoreOf(g.Name, 4) > scoreOf(best.Name, 4) ? g : best), null) ?? { Name: "Desconocida" };
 }
 
 // NVIDIA: 32.0.16.1714 -> 617.14 (los 5 últimos dígitos de los dos últimos grupos)
@@ -437,8 +439,61 @@ const OEM_PAGES = [
 ];
 export const WINDOWS_UPDATE = "ms-settings:windowsupdate-optionalupdates";
 
+// online: pregunta a Windows Update y a NVIDIA (tarda ~15 s). Sin él se usa lo ya consultado o, si no hay, la antigüedad.
+export async function drivers({ online = false } = {}) {
+  const base = await localDrivers();
+  const nvGpus = base.items.filter((i) => i.group === "Gráfica" && /nvidia/i.test(i.name));
+  const [wu, ...nv] = await Promise.all([windowsUpdateDrivers(!online), ...nvGpus.map((g) => nvidiaLatest(g.name, !online))]);
+  return withOnline(base, wu, new Map(nvGpus.map((g, k) => [g.id, nv[k]])));
+}
+
+// Clase de driver de Windows Update → grupo de la lista.
+const WU_GROUP = { display: ["Gráfica"], net: ["Wi-Fi", "Red cableada"], media: ["Audio"], bluetooth: ["Bluetooth"], system: ["Chipset"], firmware: ["BIOS"] };
+const plainName = (s) => String(s).toLowerCase().replace(/(r)|(tm)|[^a-z0-9]+/g, " ").trim();
+
+function withOnline(base, wu, nv) {
+  const pending = [...(wu ?? [])];
+  const items = base.items.map((i) => {
+    const item = { ...i, latest: null, source: "antigüedad" };
+    const latestNv = nv.get(i.id);
+    if (latestNv) {
+      // NVIDIA: se compara la versión instalada con la última publicada.
+      item.latest = latestNv.version;
+      item.source = "nvidia";
+      item.outdated = compareVersions(i.version, latestNv.version) < 0;
+      if (latestNv.url) item.page = latestNv.url;
+    }
+    if (wu) {
+      const k = pending.findIndex((u) => WU_GROUP[u.cls.toLowerCase()]?.includes(i.group) &&
+        // Nombre exacto: "RTX 3060" no debe emparejar con "RTX 3060 Ti". Lo que no encaje va a la fila «Windows Update».
+        (["Chipset", "BIOS"].includes(i.group) || (plainName(u.model) !== "" && plainName(u.model) === plainName(i.name))));
+      if (k >= 0) {
+        const [u] = pending.splice(k, 1);
+        // Manda Windows Update, salvo que NVIDIA ya tenga una versión más nueva (esa es la que conviene).
+        if (!(item.source === "nvidia" && item.outdated)) Object.assign(item, { source: "windows-update", latest: u.title, page: WINDOWS_UPDATE });
+        item.outdated = true;
+      } else if (item.source === "antigüedad" && i.group !== "BIOS") {
+        // Windows Update no tiene nada nuevo para este dispositivo. (La BIOS no siempre llega por ahí: se sigue estimando por antigüedad.)
+        item.source = "windows-update";
+        item.outdated = false;
+      }
+    }
+    return item;
+  });
+  // Lo que Windows Update tiene pendiente y no encaja con ningún dispositivo de la lista.
+  if (pending.length) {
+    items.push({
+      id: "wu-pending", group: "Windows Update", name: pending.map((u) => u.title).join(" · "),
+      version: `${pending.length} ${pending.length === 1 ? "pendiente" : "pendientes"}`, date: null, ageMonths: null, outdated: true,
+      page: WINDOWS_UPDATE, note: "Drivers que el fabricante publica por Windows Update. Se instalan desde «Actualizaciones opcionales».",
+      latest: null, source: "windows-update",
+    });
+  }
+  return { ...base, items, checked: { windowsUpdate: wu != null, nvidia: [...nv.values()].some(Boolean) } };
+}
+
 let driversCache = null;
-export async function drivers() {
+async function localDrivers() {
   if (driversCache && Date.now() - driversCache.at < 10 * 60000) return driversCache.value;
   const r = await ps(`
     $b = Get-CimInstance Win32_BIOS; $c = Get-CimInstance Win32_ComputerSystem; $bb = Get-CimInstance Win32_BaseBoard; $cp = Get-CimInstance Win32_ComputerSystemProduct
@@ -554,21 +609,25 @@ export async function scan() {
   }
 
   // Drivers y BIOS: la gráfica pesa más (afecta directamente a los juegos).
-  const drv = await drivers().catch(() => ({ items: [] }));
+  const drv = await drivers({ online: true }).catch(() => ({ items: [] }));
   const oldGpu = drv.items.filter((i) => i.group === "Gráfica" && i.outdated);
   const oldOther = drv.items.filter((i) => i.group !== "Gráfica" && i.outdated);
   for (const g of oldGpu) {
     out.push({
       id: "driver", severity: g.ageMonths >= 8 ? "media" : "baja", action: "Revisar",
       title: "Driver de la gráfica desactualizado",
-      detail: `El driver de tu ${g.name} tiene ${g.ageMonths} meses. Los nuevos incluyen optimizaciones para juegos recientes.`,
+      detail: g.source === "nvidia" && g.latest
+        ? `Tienes la ${g.version} y NVIDIA ya publicó la ${g.latest}. Los nuevos incluyen optimizaciones para juegos recientes.`
+        : `El driver de tu ${g.name} tiene ${g.ageMonths} meses. Los nuevos incluyen optimizaciones para juegos recientes.`,
     });
   }
   if (oldOther.length) {
     out.push({
       id: "drivers", severity: "baja", action: "Revisar",
-      title: `${oldOther.length === 1 ? "1 driver antiguo" : `${oldOther.length} drivers antiguos`}: ${oldOther.map((i) => i.group).join(", ")}`,
-      detail: "Pueden corregir fallos de estabilidad, ping o sonido. Se actualizan desde la página oficial del fabricante.",
+      title: `${oldOther.length === 1 ? "1 driver por actualizar" : `${oldOther.length} drivers por actualizar`}: ${oldOther.map((i) => i.group).join(", ")}`,
+      detail: oldOther.some((i) => i.source === "windows-update")
+        ? "Windows Update tiene actualizaciones de drivers para tu PC. Pueden corregir fallos de estabilidad, ping o sonido."
+        : "Pueden corregir fallos de estabilidad, ping o sonido. Se actualizan desde la página oficial del fabricante.",
     });
   }
 

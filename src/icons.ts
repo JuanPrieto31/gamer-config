@@ -14,5 +14,6 @@ import memory from "@phosphor-icons/core/assets/regular/memory.svg?raw";
 import gpu from "@phosphor-icons/core/assets/regular/graphics-card.svg?raw";
 import restore from "@phosphor-icons/core/assets/regular/clock-counter-clockwise.svg?raw";
 import info from "@phosphor-icons/core/assets/regular/info.svg?raw";
+import chart from "@phosphor-icons/core/assets/regular/chart-line.svg?raw";
 
-export const icon = { gauge, cpu, game, drive, logo, power, check, arrow, warning, shield, refresh, memory, gpu, restore, info };
+export const icon = { gauge, cpu, game, drive, logo, power, check, arrow, warning, shield, refresh, memory, gpu, restore, info, chart };
