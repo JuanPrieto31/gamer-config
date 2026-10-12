@@ -4,7 +4,7 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 
 ## Qué hace
 
-- **Detecta tus juegos** de Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox, también los que instales después, con su portada.
+- **Detecta tus juegos** de Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox, también los que instales después, con su portada (o su logo si no están en ninguna tienda).
 - **Calcula la configuración de vídeo** con todo tu hardware: gráfica (y su versión de memoria y potencia en portátiles), VRAM, procesador, hilos, cantidad, canales y velocidad de la RAM, disco, batería, plan de energía, resolución y Hz de la pantalla principal. Usa los requisitos de Steam de cada juego y el coste de cada ajuste.
 - **Aprende de tus FPS reales**: cuando mides una partida con las estadísticas en el juego, corrige el cálculo de ese juego en tu PC.
 - **Perfiles propios** para LoL, Apex, Deadlock, Warframe, Dying Light, RE6, Fortnite, Counter-Strike 2, GTA V, Minecraft y Marvel Rivals; los juegos de Unreal Engine y el resto se configuran por detección automática.
@@ -15,6 +15,7 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 - **Estadísticas en el juego**: FPS, 1 % más bajo, uso y temperatura de la gráfica, VRAM, CPU y RAM encima del juego, con un atajo de teclado. Personalizable (qué mostrar, posición, tamaño, fondo). No inyecta nada en el juego, así que es seguro con los antitrampas, y oculto no consume nada.
 - **Modo juego automático**: al abrir un juego pone el plan de máximo rendimiento y cierra los programas que elijas; al cerrarlo, todo vuelve a como estaba.
 - **Prueba de conexión**: ping hasta el router, internet y varias regiones de servidores, para saber si el lag es de tu Wi-Fi, de tu proveedor o del juego.
+- **Libera espacio tras actualizar**: cuando un juego se actualiza (Steam, Epic, Roblox), borra solo los archivos que sobran del parche (descargas a medias, versiones anteriores) para que no crezca de tamaño. Automático (se puede apagar) o a mano desde la ficha del juego, siempre con el juego cerrado.
 - **Segundo plano y actualizaciones automáticas**: se queda junto al reloj y se actualiza sola desde las versiones de este repositorio.
 
 Antes de cambiar un archivo de un juego se guarda una copia, y todo se puede deshacer.

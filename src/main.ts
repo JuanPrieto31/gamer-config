@@ -429,7 +429,7 @@ function meter(k: keyof Usage, label: string, value: number | null | undefined, 
 }
 
 const cover = (g: Game, big = false) =>
-  `<div class="cover${big ? " big" : ""}${g.imageFit === "icon" ? " icon" : ""}">${g.image ? `<img src="${g.image}" alt="" loading="lazy" />` : ""}<span class="fallback">${esc(g.name[0])}</span></div>`;
+  `<div class="cover${big ? " big" : ""}${g.imageFit === "icon" ? " icon" : ""}">${g.image && g.imageFit === "icon" ? `<img class="bg" src="${g.image}" alt="" loading="lazy" />` : ""}${g.image ? `<img src="${g.image}" alt="" loading="lazy" />` : ""}<span class="fallback">${esc(g.name[0])}</span></div>`;
 
 const gameMeta = (g: Game) => (g.sizeGb == null ? g.store : `${g.store} · ${g.sizeGb.toLocaleString("es")} GB`);
 const spec = (k: string, v: string) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`;

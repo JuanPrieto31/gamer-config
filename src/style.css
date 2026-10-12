@@ -519,5 +519,7 @@ kbd { font: 600 12px/1 Consolas, monospace; padding: 2px 6px; border: 1px solid 
 .oem-tool > div { display: grid; gap: 2px; }
 
 /* Portada que en realidad es un icono (Riot, Xbox, Roblox): centrada y entera sobre un fondo neutro */
-.cover.icon { background: var(--surface-2); }
-.cover.icon img { object-fit: contain; padding: 14%; }
+.cover.icon { background: linear-gradient(135deg, #eceef2, #c9ced6); }
+.cover.icon img { object-fit: contain; padding: 12%; position: relative; z-index: 1; filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.25)); }
+/* Logos (LoL, Roblox, Minecraft...): fondo claro (se ven también los logos negros) teñido con los colores del propio logo, para que la tarjeta se vea llena como una portada. */
+.cover.icon img.bg { position: absolute; z-index: 0; padding: 0; object-fit: cover; transform: scale(1.6); opacity: 0.55; filter: blur(26px) saturate(1.5); }
