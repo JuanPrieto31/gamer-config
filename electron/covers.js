@@ -127,13 +127,14 @@ async function loadCache() {
 
 const fresh = (hit, found) => hit && Date.now() - hit.at < (found ? 365 : 30) * 864e5; // lo no encontrado se reintenta al mes
 
-// Icono que trae el propio juego (Riot, Roblox): el último recurso si no hay portada ni logo.
+// Icono que trae el propio juego (Riot, Roblox, Xbox): el último recurso si no hay portada ni logo.
 async function localIcon(g) {
   if (g.store === "Riot") {
     const p = g.id.replace(/^riot-/, "");
     return localImage(path.join(RIOT_DIR, p, `${p}.ico`));
   }
   if (g.store === "Roblox") return exeIcon(await robloxExe(g.path));
+  if (g.store === "Xbox") return xboxLogo(g.path);
   return null;
 }
 
@@ -152,10 +153,6 @@ export async function addCovers(games) {
         if (id !== undefined) { c[g.id] = { ...c[g.id], id, at: Date.now() }; changed = true; }
       }
       if (c[g.id]?.id) g.image = steamHeader(c[g.id].id);
-    }
-    if (!g.image && g.store === "Xbox") {
-      g.image = (await xboxLogo(g.path)) ?? "";
-      if (g.image) g.imageFit = "icon";
     }
   }));
   // 2) Ni Steam ni Epic lo tienen (LoL, Roblox, Minecraft...): su logo en Wikipedia. Uno a uno, para no saturarla,
