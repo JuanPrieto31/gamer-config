@@ -3,7 +3,8 @@ import { app } from "electron";
 import * as system from "./system.js";
 import * as optimize from "./optimize.js";
 import * as win from "./windows.js";
-import { solve } from "./calc.js";
+import { solve, supports } from "./calc.js";
+import { applyTech, capabilities } from "./tech.js";
 import * as cleanup from "./cleanup.js";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -39,7 +40,98 @@ function checkCalc() {
   const rtx3050 = solve(generic, { score: 70, cpuScore: 110, refresh: 144, pixels: 1920 * 1080, vramGb: 8 }, { gpu: 100, cpu: 100 }, "equilibrado", { gpu: 1, cpu: 1 }, { vramScale: Math.sqrt(2) });
   const notUltra = rtx3050.picks.get("shadows").value !== "3" && rtx3050.picks.get("gi").value !== "3" && rtx3050.picks.get("tex").value !== "3";
   console.log(notUltra ? "ok RTX 3050 en juego exigente: no todo en Ultra" : "X  RTX 3050 sale con Ultra", JSON.stringify([...rtx3050.picks].map(([k, v]) => `${k}=${v.value}`)));
-  return ok && notUltra;
+
+  // Escalado: una gráfica justa activa DLSS antes de hundir las sombras; una sobrada se queda en nativa.
+  // Y la referencia "Alto" se mide en nativa: el escalado no cambia lo estimado al máximo.
+  // (Qué escalado según la marca lo decide tech.js: ver checkTech.)
+  // Como en los perfiles: bajar de DLSS Calidad a Equilibrado o Rendimiento se nota mucho más (visual 3 y 4).
+  const up = [
+    { key: "dlss", tech: "dlss", upscaler: true, visual: 1, levels: [0, 10, 21, 70].map((c, i) => ({ value: String(i), cost: c, visual: [1, 4, 3, 1][i] })) },
+    { key: "shadows", visual: 2, levels: [0, 8, 17].map((c, i) => ({ value: String(i), cost: c })) },
+    { key: "gi", visual: 2, levels: [0, 10, 20, 30].map((c, i) => ({ value: String(i), cost: c })) },
+  ];
+  const hwUp = (score, rtx) => ({ score, cpuScore: 300, refresh: 144, pixels: 1920 * 1080, vramGb: 8, vendor: "nvidia", rtx });
+  const justa = solve(up, hwUp(130, true), { gpu: 100, cpu: 100 }, "equilibrado");
+  const sobrada = solve(up, hwUp(400, true), { gpu: 100, cpu: 100 }, "calidad");
+  const sinUp = solve(up.slice(1), hwUp(130, true), { gpu: 100, cpu: 100 }, "equilibrado");
+  const upOk = justa.picks.get("dlss").value === "2" && justa.picks.get("gi").value !== "0" && justa.reached
+    && sobrada.picks.get("dlss").value === "3" && justa.estMax === sinUp.estMax;
+  console.log(upOk ? "ok escalado (DLSS)" : "X  escalado (DLSS)", JSON.stringify({ justa: [...justa.picks].map(([k, v]) => `${k}=${v.value}`), fps: justa.estFinal, sobrada: sobrada.picks.get("dlss").value }));
+  return ok && notUltra && upOk;
+}
+
+// Tecnologías con todas las marcas, sobre el perfil real de Marvel Rivals (DLSS, FSR, XeSS, generación de fotogramas, Reflex).
+async function checkTech() {
+  const raw = JSON.parse(await fs.readFile(new URL("../profiles/marvelrivals.json", import.meta.url), "utf8"));
+  const settings = raw.settings.map((s) => ({ ...s, levels: s.levels.map((l) => ({ value: String(l[0]), label: l[1], cost: l[2] ?? 0, ...(l[3] ?? {}) })) }));
+  const pc = (gpu, vendor, score) => ({ gpu, vendor, rtx: /nvidia.*\brtx\b/i.test(gpu), score, cpuScore: 150, refresh: 144, pixels: 1920 * 1080, vramGb: 8 });
+  const prefs = (p) => ({ upscaler: "auto", quality: "auto", dlssModel: "auto", frameGen: "off", latency: "auto", ...p });
+  const run = (hw, p) => {
+    const { settings: s } = applyTech(settings.filter((x) => supports(x, hw)), hw, prefs(p));
+    const r = solve(s, hw, { gpu: 100, cpu: 100 }, "equilibrado");
+    const up = s.find((x) => x.upscaler);
+    const fg = s.filter((x) => x.framegen).map((x) => `${x.tech}=${r.picks.get(x.key)?.mode}`).join(",");
+    return { up: up?.tech, upLevel: r.picks.get(up?.key)?.mode, fg, reflex: r.picks.has("bNvidiaReflex"), fps: r.estFinal };
+  };
+  const cases = [
+    ["RTX 3050 portátil, auto", pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 60), {}, (r) => r.up === "dlss" && r.reflex],
+    ["RTX 3050, FG 2x → FSR (DLSS FG necesita RTX 40)", pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 60), { frameGen: "2x" }, (r) => r.fg.includes("fsr-fg=2x") && r.fg.includes("dlss-fg=off")],
+    ["RTX 4070, FG 4x → DLSS 2x", pc("NVIDIA GeForce RTX 4070", "nvidia", 150), { frameGen: "4x" }, (r) => r.fg.includes("dlss-fg=2x") && r.fg.includes("fsr-fg=off")],
+    ["RTX 5070, FG 4x → DLSS 4x", pc("NVIDIA GeForce RTX 5070", "nvidia", 200), { frameGen: "4x" }, (r) => r.fg.includes("dlss-fg=4x")],
+    ["GTX 1650, pide DLSS → FSR", pc("NVIDIA GeForce GTX 1650", "nvidia", 35), { upscaler: "dlss" }, (r) => r.up === "fsr" && r.reflex],
+    ["RX 6600, auto → FSR sin Reflex", pc("AMD Radeon RX 6600", "amd", 95), {}, (r) => r.up === "fsr" && !r.reflex],
+    ["RX 9070, XeSS elegido", pc("AMD Radeon RX 9070", "amd", 230), { upscaler: "xess" }, (r) => r.up === "xess"],
+    ["Intel Arc A750, auto → XeSS", pc("Intel(R) Arc(TM) A750 Graphics", "intel", 90), {}, (r) => r.up === "xess" && !r.reflex],
+    ["Intel Iris Xe, auto → FSR", pc("Intel(R) Iris(R) Xe Graphics", "intel", 13), {}, (r) => r.up === "fsr"],
+    ["RTX 3050, escalado apagado → nativa sin escalado", pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 60), { upscaler: "off" }, (r) => r.up === "fsr" && r.upLevel === "nativo"],
+    ["RTX 3050, calidad fija → DLSS Calidad", pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 30), { quality: "calidad" }, (r) => r.up === "dlss" && r.upLevel === "calidad"],
+  ];
+  let ok = true;
+  for (const [name, hw, p, check] of cases) {
+    const r = run(hw, p);
+    const good = check(r);
+    ok = ok && good;
+    console.log(good ? "ok" : "X ", "tecnologías:", name, JSON.stringify(r));
+  }
+  const caps = capabilities(pc("NVIDIA GeForce RTX 5090 Laptop GPU", "nvidia", 200));
+  if (!(caps.dlssMfg && caps.dlssFg)) { ok = false; console.log("X  tecnologías: RTX 5090 portátil sin MFG", JSON.stringify(caps)); }
+
+  // Automático por componentes: generación de fotogramas según FPS reales, Hz y modo; peso visual por resolución.
+  const auto = prefs({ frameGen: "auto" });
+  const fgOf = (hw, goal, baseFps) => applyTech(settings.filter((x) => supports(x, hw)), hw, auto, { goal, baseFps }).settings
+    .filter((x) => x.framegen && x.fixedLevel?.mode !== "off").map((x) => `${x.tech}=${x.fixedLevel.mode}`).join(",") || "off";
+  const hz = (hw, refresh) => ({ ...hw, refresh });
+  const rtx4070 = pc("NVIDIA GeForce RTX 4070", "nvidia", 150);
+  const autoCases = [
+    ["FG auto: RTX 4070, 70 FPS, 144 Hz → DLSS 2x", fgOf(rtx4070, "equilibrado", 70), "dlss-fg=2x"],
+    ["FG auto: RTX 5070, 70 FPS, 240 Hz → DLSS 3x", fgOf(hz(pc("NVIDIA GeForce RTX 5070", "nvidia", 200), 240), "calidad", 70), "dlss-fg=3x"],
+    ["FG auto: modo FPS → apagada", fgOf(rtx4070, "fps", 70), "off"],
+    ["FG auto: 40 FPS → apagada", fgOf(rtx4070, "equilibrado", 40), "off"],
+    ["FG auto: 100 FPS en 144 Hz → apagada (no caben)", fgOf(rtx4070, "equilibrado", 100), "off"],
+    ["FG auto: RTX 3050, 70 FPS → FSR 2x", fgOf(pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 60), "equilibrado", 70), "fsr-fg=2x"],
+    ["FG auto: RX 6600, 65 FPS → FSR 2x", fgOf(pc("AMD Radeon RX 6600", "amd", 95), "calidad", 65), "fsr-fg=2x"],
+  ];
+  for (const [name, got, want] of autoCases) {
+    ok = ok && got === want;
+    console.log(got === want ? "ok" : "X ", "tecnologías:", name, got);
+  }
+  const at4k = applyTech(settings, { ...rtx4070, pixels: 3840 * 2160 }, prefs({})).settings.find((x) => x.upscaler);
+  const at1080 = applyTech(settings, rtx4070, prefs({})).settings.find((x) => x.upscaler);
+  const resOk = at4k.levels[1].visual < at1080.levels[1].visual && at4k.levels.at(-1).visual === at1080.levels.at(-1).visual;
+  ok = ok && resOk;
+  console.log(resOk ? "ok" : "X ", "tecnologías: a 4K bajar el escalado pesa menos que a 1080p", at4k.levels[1].visual, at1080.levels[1].visual);
+
+  // Tipo de DLSS (perfil real de Deadlock): Transformer en automático, CNN si se elige, y nada si el escalado no es DLSS.
+  const dl = JSON.parse(await fs.readFile(new URL("../profiles/deadlock.json", import.meta.url), "utf8"));
+  const dset = dl.settings.map((s) => ({ ...s, levels: s.levels.map((l) => ({ value: String(l[0]), label: l[1], cost: l[2] ?? 0, ...(l[3] ?? {}) })) }));
+  const model = (hw, p) => applyTech(dset.filter((x) => supports(x, hw)), hw, prefs(p)).settings.find((x) => x.dlssModel)?.fixedLevel?.value ?? "ninguno";
+  const rtx3050 = pc("NVIDIA GeForce RTX 3050 6GB Laptop GPU", "nvidia", 60);
+  const models = [["auto", model(rtx3050, {}), "10"], ["CNN", model(rtx3050, { dlssModel: "cnn" }), "5"], ["con FSR", model(rtx3050, { upscaler: "fsr" }), "ninguno"], ["AMD", model(pc("AMD Radeon RX 6600", "amd", 95), {}), "ninguno"]];
+  for (const [name, got, want] of models) {
+    ok = ok && got === want;
+    console.log(got === want ? "ok" : "X ", "tecnologías: tipo de DLSS", name, got);
+  }
+  return ok;
 }
 
 // Limpieza de basura de actualizaciones, en una carpeta temporal falsa (no toca ningún juego real).
@@ -109,6 +201,7 @@ async function checkCleanup() {
 
 app.whenReady().then(async () => {
   let ok = checkCalc();
+  try { ok = (await checkTech()) && ok; } catch (e) { ok = false; console.error("FALLO tecnologías", e); }
   try { ok = (await checkCleanup()) && ok; } catch (e) { ok = false; console.error("FALLO limpieza", e); }
   try {
     console.log("HW", JSON.stringify(await system.hardware()));

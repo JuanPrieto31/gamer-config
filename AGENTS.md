@@ -44,6 +44,8 @@ Con `--pruebas`, la app usa otra carpeta de datos (`%APPDATA%\Gamer Config (prue
 | `electron/gpus.js`, `electron/cpus.js` | Tablas de rendimiento relativo de gráficas (con VRAM por versión, iGPU y potencia en portátiles) y procesadores |
 | `electron/demand.js` | Requisitos de cada juego (Steam) para estimar lo que pide |
 | `electron/optimize.js` | Perfiles, plan de ajustes, escritura atómica con copia de seguridad, calibración con FPS reales |
+| `electron/tech.js` | Tecnologías de imagen (configuración global): qué admite cada gráfica (DLSS, FSR, XeSS, generación de fotogramas, Reflex) y las preferencias del usuario |
+| `electron/nvidia.js` | Referencia de NVIDIA: lee de la caché local de la app de NVIDIA (si está) el paso de sus ajustes óptimos para este PC. Solo lectura, sin red |
 | `electron/configparse.js` | Lector/escritor de formatos: ini, json, xml, kv (Valve), scr, space, colon (Minecraft). Solo cambia el valor, respeta el resto del archivo |
 | `electron/autodetect.js` | Busca archivos de configuración de juegos sin perfil |
 | `electron/windows.js` | Optimizaciones de Windows con historial y deshacer |
@@ -71,6 +73,21 @@ Al añadir o cambiar un perfil:
   - El **coste** es el % aproximado de FPS que cuesta en la gráfica.
   - `visual` es el peso de lo que se pierde en imagen al bajarlo: por defecto 1, más alto si se nota mucho. Va en el ajuste o en cada nivel.
   - `fixed` fuerza un valor por modo.
+  - `also` (en el nivel): claves extra que se escriben junto al valor. Por ejemplo, DLSS Calidad en Deadlock = modo + escalado + resolución interna. Para saber si el juego ya está en ese nivel se comprueban todas.
+  - `match` (en el nivel): otros valores que equivalen a ese nivel, como el modo "Automático" de DLSS = Calidad.
+- **Tecnologías** (`electron/tech.js`): cada una es un ajuste aparte del perfil.
+  - **Escalado:** `upscaler: true` + `tech: "dlss" | "fsr" | "xess"`. Los niveles llevan `mode: "rendimiento" | "equilibrado" | "calidad" | "nativo"`, con el nativo al final, y `off: true` en el que apaga el escalado. Se usa uno solo, el que elija el usuario o el mejor que admita la gráfica.
+  - **Generación de fotogramas:** `framegen: true` + `tech: "dlss-fg" | "fsr-fg"`, con niveles `mode: "off" | "2x" | "3x" | "4x"`.
+  - **Baja latencia:** `latency: true`, con niveles `mode: "off" | "on" | "boost"`.
+  - **Tipo de DLSS:** `dlssModel: true`, con niveles `mode: "cnn" | "transformer"`. Solo se escribe si el escalado elegido es DLSS.
+  - **Automático por componentes (por defecto):**
+    - El escalado es el mejor que admite la gráfica.
+    - Su calidad pesa según la resolución: a 4K bajar se nota la mitad que a 1080p.
+    - El tipo de DLSS es Transformer.
+    - La generación de fotogramas se activa solo si los FPS reales son 50 o más, caben en los Hz de la pantalla y no es el modo FPS. Por eso `plan()` calcula dos veces.
+  - El escalado multiplica el trabajo de la gráfica y el cálculo lo trata aparte: la referencia "Alto" siempre es en resolución nativa.
+  - **Coste de los niveles de escalado:** usa los de los perfiles existentes, porque guardan la proporción real: Rendimiento 0, Equilibrado 10, Calidad 21, nativo 70.
+  - Los valores de cada juego se comprueban con su archivo real antes de subir.
 - **Fuentes:** costes basados en fuentes reales (guías de NVIDIA, del desarrollador…), citadas en `sources`.
 - **Etiquetas:** en español, neutras y comprensibles.
 - **Comprobación:** `npm test` simula los tres modos en los juegos instalados en tu PC. Solo prueba el perfil si tienes el juego. Si no lo tienes, pruébalo con un archivo de configuración de ejemplo, comprobando que se lee y que la escritura no cambia el número de líneas.

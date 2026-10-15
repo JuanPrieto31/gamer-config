@@ -16,7 +16,9 @@ import { fileURLToPath } from "node:url";
 import { hardware, steamPath, powerNow } from "./system.js";
 import { record } from "./windows.js";
 import { demandFor } from "./demand.js";
-import { solve, factors } from "./calc.js";
+import { solve, factors, supports } from "./calc.js";
+import { nvidiaReference } from "./nvidia.js";
+import { applyTech } from "./tech.js";
 import { findConfigs, autoSettings, genericFormat, detectFormat, parse as parseConfig } from "./autodetect.js";
 import { write as writeConfig, parse } from "./configparse.js";
 
@@ -412,22 +414,32 @@ function same(a, b) {
   const [x, y] = [norm(a), norm(b)];
   if (x === y) return true;
   const [nx, ny] = [Number(x), Number(y)];
-  return x !== "" && y !== "" && !Number.isNaN(nx) && !Number.isNaN(ny) && Math.abs(nx - ny) < 0.5;
+  // "1" = "1.000000"; con decimales (escala de resolución 0,5 / 0,58 / 0,67) hay que afinar más.
+  const tol = Number.isInteger(nx) && Number.isInteger(ny) ? 0.5 : 0.01;
+  return x !== "" && y !== "" && !Number.isNaN(nx) && !Number.isNaN(ny) && Math.abs(nx - ny) < tol;
 }
-const labelOf = (s, v) => (v == null ? "No definido" : s.levels.find((l) => same(l.value, v))?.label ?? String(v).replace(/^"|"$/g, ""));
+// Un nivel puede escribir más claves a la vez (also): DLSS Calidad = modo DLSS + calidad + escala de resolución.
+const alsoOk = (l, read) => Object.entries(l?.also ?? {}).every(([k, v]) => same(read(k), v));
+// Nivel que tiene ahora el juego: su valor (o un alias de match, p. ej. "Automático") y todas sus claves extra.
+const levelNow = (s, v, read) => (v == null ? null : s.levels.find((l) => (same(l.value, v) || l.match?.some((m) => same(m, v))) && alsoOk(l, read)) ?? null);
+// ¿El juego ya tiene este nivel? Su valor y claves extra, o un alias (DLSS "Automático" = Calidad).
+const isAt = (s, rec, read) => (same(read(s.key), rec.value) && alsoOk(rec, read)) || levelNow(s, read(s.key), read) === rec;
+const labelOf = (s, v, read) => (v == null ? "No definido" : levelNow(s, v, read)?.label ?? String(v).replace(/^"|"$/g, ""));
 
 /* ---------- Plan: cálculo + lo que hay ahora en el archivo ---------- */
 
-async function plan(game, goal, { raw = false } = {}) {
+async function plan(game, goal, { raw = false, text: given } = {}) {
   const hw = await hardware();
   const found = await findProfile(game, hw);
   const { profile } = found;
-  const [demand, power] = await Promise.all([
+  const [demand, power, nvRef] = await Promise.all([
     demandFor(game, profile).catch(() => ({ gpu: null, cpu: null })),
     powerNow(),
+    nvidiaReference(game, hw).catch(() => null),
   ]);
   const ctx = { onBattery: power.onBattery, plan: power.plan, gameDrive: game.path?.match(/^([a-z]):/i)?.[1].toUpperCase() ?? null };
   const f = factors(hw, demand, ctx);
+  if (nvRef) f.list.push(nvRef);
   // Sin gráfica en los requisitos pero sí procesador: un juego que pide un procesador antiguo no pide una gráfica actual.
   const gpuFromCpu = demand.cpu ? Math.min(Math.max(Math.round(demand.cpu.score * 0.6), 5), DEFAULT_GPU) : null;
   const scores = { gpu: demand.gpu?.score ?? gpuFromCpu ?? DEFAULT_GPU, cpu: demand.cpu?.score ?? DEFAULT_CPU };
@@ -435,10 +447,22 @@ async function plan(game, goal, { raw = false } = {}) {
   // (Los perfiles ya traen la memoria exacta que necesita cada nivel.)
   const vramScale = found.kind === "perfil" ? 1
     : Math.max(Math.min(Math.sqrt(scores.gpu / 50), 2), 0.8, demand.vramGb ? demand.vramGb / 5 : 0);
-  const text = found.file ? await fs.readFile(found.file, "utf8").catch(() => null) : null;
+  const text = given ?? (found.file ? await fs.readFile(found.file, "utf8").catch(() => null) : null);
   const fmt = found.fmt ?? (found.format ? FORMATS[found.format] : null);
+  const read = (k) => (text != null && fmt ? fmt.read(text, k) : null);
+  // Tecnologías (configuración global): un solo escalado, y lo que el usuario haya fijado.
+  const base = profile.settings.filter((s) => supports(s, hw));
+  let tech = applyTech(base, hw, undefined, { goal });
+  let usable = tech.settings;
   // Ajustes que el juego tiene ahora: para estimar sus FPS y compararlos con los medidos por el overlay.
-  const current = new Map(text != null && fmt ? profile.settings.map((s) => [s.key, fmt.read(text, s.key)]).filter(([, v]) => v != null) : []);
+  // El escalado solo cuenta si coinciden todas sus claves (DLSS apagado con "Calidad" guardado = nativa).
+  // Si el juego tiene activo otro escalado (FSR y se ha elegido DLSS), cuenta como el mismo modo del elegido.
+  const upNow = profile.settings.filter((s) => s.upscaler).map((s) => levelNow(s, read(s.key), read)).find(Boolean);
+  const current = new Map(usable.map((s) => {
+    if (!s.upscaler) return [s.key, read(s.key)];
+    const lv = levelNow(s, read(s.key), read) ?? (upNow && s.levels.find((l) => l.mode === (upNow.off ? "nativo" : upNow.mode)));
+    return [s.key, lv?.value];
+  }).filter(([, v]) => v != null));
 
   // Calibración con FPS reales de este juego en este PC (si los hay): corrige el cálculo en ambos sentidos.
   const cal = raw ? null : (await readCalibration())[game.id];
@@ -448,14 +472,22 @@ async function plan(game, goal, { raw = false } = {}) {
     f.list.push({ label: "Tus FPS reales", value: `${cal.sessions} ${cal.sessions === 1 ? "partida" : "partidas"}`, effect: "info",
       note: Math.abs(pct) < 3 ? "Medidos con el overlay: coinciden con lo estimado" : `Medidos con el overlay: este juego te va un ${Math.abs(pct)} % ${pct > 0 ? "mejor" : "peor"} de lo estimado; el cálculo ya lo tiene en cuenta` });
   }
-  const result = solve(profile.settings, hw, scores, goal, mult, { vramScale, current });
+  let result = solve(usable, hw, scores, goal, mult, { vramScale, current });
+  // Generación de fotogramas automática: depende de los FPS reales que salen del cálculo (no cambia el resto).
+  if (base.some((s) => s.framegen)) {
+    // Sin partidas medidas con el overlay los FPS son solo calculados: margen del 15 % para no activarla en un juego justo.
+    tech = applyTech(base, hw, undefined, { goal, baseFps: cal ? result.estFinal : result.estFinal * 0.85, measured: !!cal });
+    usable = tech.settings;
+    result = solve(usable, hw, scores, goal, mult, { vramScale, current });
+  }
+  for (const note of tech.notes) f.list.push({ label: "Tecnologías", value: "Automático según tu equipo o tu elección", effect: "info", note });
   result.factors = f.list;
-  const settings = profile.settings
+  const settings = usable
     .filter((s) => result.picks.has(s.key))
     .map((s) => {
       const rec = result.picks.get(s.key);
-      const current = text != null && fmt ? fmt.read(text, s.key) : null;
-      return { s, recommended: rec.value, recLabel: rec.label, current, change: current != null && !same(current, rec.value) };
+      const current = read(s.key);
+      return { s, rec, recommended: rec.value, recLabel: rec.label, current, change: current != null && !isAt(s, rec, read) };
     })
     // En perfiles automáticos solo se muestran los ajustes que el juego tiene de verdad.
     .filter((x) => (found.kind !== "auto" && found.kind !== "detectado") || text == null || x.current != null);
@@ -517,6 +549,8 @@ export async function detail(game, goal) {
     estMax: p.result.estMax,
     estFinal: p.result.estFinal,
     estCurrent: p.result.estCurrent,
+    // FPS de verdad: la mediana de la última partida medida con las estadísticas en el juego (si la hay).
+    measuredFps: (await readCalibration())[game.id]?.lastMeasured ?? null,
     target: p.result.target,
     reached: p.result.reached,
     loweredNothing: p.result.loweredNothing,
@@ -525,7 +559,7 @@ export async function detail(game, goal) {
     hasBackup: backups.some((b) => b.startsWith(`${safeId(game.id)}-original`)),
     settings: p.settings.map((x) => ({
       name: x.s.label, key: x.s.auto ? x.s.key.replace(/^.*::/, "") : null, why: x.s.why, change: x.change,
-      current: p.kind === "guia" ? null : labelOf(x.s, x.current), recommended: x.recLabel,
+      current: p.kind === "guia" ? null : labelOf(x.s, x.current, (k) => (p.text != null && p.fmt ? p.fmt.read(p.text, k) : null)), recommended: x.recLabel,
     })),
   };
 }
@@ -542,8 +576,12 @@ function rewrite(p) {
   let text = p.text;
   let changed = 0;
   for (const x of p.settings.filter((x) => x.change)) {
-    const next = p.fmt.write(text, x.s.key, x.recommended, nl);
-    if (next != null) { text = next; changed++; }
+    // Un nivel con claves extra se escribe entero o nada: DLSS a medias deja el juego en un estado raro.
+    let next = p.fmt.write(text, x.s.key, x.recommended, nl);
+    for (const [k, v] of Object.entries(x.rec.also ?? {})) next = next == null ? null : p.fmt.write(next, k, v, nl);
+    if (next == null) continue;
+    text = next;
+    changed++;
   }
   return { text, changed };
 }
@@ -589,11 +627,13 @@ export async function restoreOriginal(game) {
 }
 
 // Para la comprobación (npm test): calcula y aplica en memoria, sin escribir nada, y relee cada valor.
-export async function dryRun(game, goal) {
-  const p = await plan(game, goal);
+// text: contenido de prueba en lugar del archivo real (para comprobar escrituras sin tocar el juego).
+export async function dryRun(game, goal, testText) {
+  const p = await plan(game, goal, { text: testText });
   const base = { kind: p.kind, estMax: p.result.estMax, estFinal: p.result.estFinal, target: p.result.target, demand: p.demand, bottleneck: p.result.bottleneck, factors: p.result.factors };
   if (p.kind === "guia" || p.text == null) return { ...base, changed: 0, failed: [], linesBefore: 0, linesAfter: 0, noFile: true };
   const { text, changed } = rewrite(p);
-  const failed = p.settings.filter((x) => x.current != null && !same(p.fmt.read(text, x.s.key), x.recommended)).map((x) => x.s.key);
-  return { ...base, changed, failed, linesBefore: p.text.split(/\r?\n/).length, linesAfter: text.split(/\r?\n/).length };
+  const reread = (k) => p.fmt.read(text, k);
+  const failed = p.settings.filter((x) => x.current != null && !isAt(x.s, x.rec, reread)).map((x) => x.s.key);
+  return { ...base, changed, failed, linesBefore: p.text.split(/\r?\n/).length, linesAfter: text.split(/\r?\n/).length, textAfter: text };
 }

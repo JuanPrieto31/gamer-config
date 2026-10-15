@@ -227,6 +227,21 @@ dd { margin-top: 2px; font-weight: 500; }
 .central .row-main > span { font-size: 13px; max-width: 70ch; }
 .central-actions { display: flex; align-items: center; gap: 12px; flex: none; }
 .central .seg { margin-top: 0; }
+
+/* Tecnologías de imagen (configuración global) */
+.globals { padding-block: 6px; margin-bottom: 20px; }
+.g-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 0; }
+.g-row + .g-row, .tech-panel + .g-row { border-top: 1px solid var(--line); }
+.g-row .row-main { display: grid; gap: 2px; min-width: 0; }
+.g-row .row-main > span { font-size: 13px; }
+.g-row .btn, .g-row .switch { flex: none; }
+.tech-panel { display: grid; gap: 10px; padding: 4px 0 16px; }
+.tech-row { display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: center; gap: 12px; }
+.tech-row > span { font-size: 13px; font-weight: 500; }
+.tech-panel .seg { margin-top: 0; flex-wrap: wrap; justify-self: start; }
+.tech-panel .seg[disabled], .tech-panel .seg label.na { opacity: 0.45; }
+.tech-panel .seg label.na input, .tech-panel .seg[disabled] input { cursor: not-allowed; }
+@media (max-width: 1100px) { .tech-row { grid-template-columns: 1fr; gap: 6px; } }
 dialog:has(.results) { width: min(560px, calc(100vw - 32px)); }
 .results .rows { max-height: 55vh; overflow-y: auto; margin-top: 8px; }
 .results .row-main span { font-size: 12.5px; }
@@ -417,7 +432,7 @@ dialog[open] { animation: pop 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
 }
 
 /* ---------- Pestañas ---------- */
-.tabs { display: flex; gap: 2px; margin: 4px 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: 4px 0 0; border-bottom: 1px solid var(--line); }
 .tab {
   display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: -1px;
   border-bottom: 2px solid transparent; color: var(--muted); font-weight: 500; white-space: nowrap;
@@ -491,7 +506,12 @@ kbd { font: 600 12px/1 Consolas, monospace; padding: 2px 6px; border: 1px solid 
 .ov-tl .ov-box { top: 10px; left: 10px; } .ov-tr .ov-box { top: 10px; right: 10px; }
 .ov-bl .ov-box { bottom: 10px; left: 10px; } .ov-br .ov-box { bottom: 10px; right: 10px; }
 .ov-notes { margin-top: 14px; padding-left: 18px; display: grid; gap: 6px; }
-@media (max-width: 1100px) { .ov-layout { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) {
+  .ov-layout { grid-template-columns: 1fr; }
+  .ov-screen { max-width: 520px; }
+}
+.ov-more { margin-top: 12px; }
+.ov-more > summary { cursor: pointer; padding: 4px 0; }
 
 /* ---------- Modo juego automático ---------- */
 .gm { margin-bottom: 16px; }

@@ -166,6 +166,7 @@ export async function hardware() {
     score: scoreOf(gpu.Name, vram ? Math.round(vram / GB) : null, { laptop, watts }),
     gpuWatts: watts,
     vendor: /nvidia/i.test(gpu.Name) ? "nvidia" : /amd|radeon/i.test(gpu.Name) ? "amd" : /intel/i.test(gpu.Name) ? "intel" : "other",
+    rtx: /nvidia.*\brtx\b/i.test(gpu.Name), // DLSS: todas las RTX (GeForce, Quadro y profesionales)
     vramGb,
     ...gameScreen(r),
     laptop,

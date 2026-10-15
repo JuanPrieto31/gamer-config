@@ -2,7 +2,7 @@ import "./style.css";
 import { icon } from "./icons";
 import { friendlyName, describe, isVideoSetting } from "./names";
 import { api, errorText } from "./api";
-import type { GameModeSettings, GameModeState, NetResult, OpenApp, ActionResult, ApplyResult, DriverInfo, DriverItem, OverlayMetric, OverlaySettings, OverlayState, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
+import type { TechSettings, TechState, GameModeSettings, GameModeState, NetResult, OpenApp, ActionResult, ApplyResult, DriverInfo, DriverItem, OverlayMetric, OverlaySettings, OverlayState, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
 
 type View = "panel" | "sistema" | "juegos" | "juego";
 
@@ -34,6 +34,8 @@ const state = {
   detail: null as GameDetail | null,
   goal: (safeGet("goal") as Goal | null) ?? "equilibrado",
   cleanAuto: true, // borrar solo la basura de las actualizaciones
+  tech: null as TechState | null, // tecnologías de imagen (configuración global)
+  techOpen: false,
 };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -126,7 +128,7 @@ function overlayView() {
       <section class="block ov-perm">
         <div>
           <h2>Activar la medición de FPS</h2>
-          <p class="muted">Para contar los fotogramas, Windows exige un permiso: añadir tu usuario al grupo «Usuarios del registro de rendimiento». Se hace una vez (pide permiso de administrador) y luego hay que cerrar sesión o reiniciar. Se puede deshacer desde el historial. El resto de estadísticas funciona sin esto.</p>
+          <p class="muted">Windows pide un permiso una sola vez para contar fotogramas (como administrador; después cierra sesión o reinicia). Se puede deshacer desde el historial. El resto de estadísticas ya funciona.</p>
         </div>
         <button class="btn primary" data-act="overlay-fps">Activar FPS</button>
       </section>`}
@@ -152,12 +154,13 @@ function overlayView() {
             ${OV_METRICS.filter(([k]) => s.metrics[k]).map(([k]) => `<span class="k">${OV_SAMPLE[k][0]}</span><span class="v">${OV_SAMPLE[k][1]}</span>`).join("")}
           </div>
         </div>
+        <details class="ov-more"><summary class="muted small">Dónde se ve y qué mide</summary>
         <ul class="ov-notes muted small">
           <li>Se ve encima del juego en «pantalla completa sin bordes» o en ventana. En pantalla completa exclusiva Windows no deja dibujar encima.</li>
           <li>No toca el juego: no inyecta nada, así que es seguro con los antitrampas (Vanguard, Easy Anti-Cheat…).</li>
           <li>La temperatura del procesador no se muestra: Windows no la da sin instalar un driver especial, y eso sí podría dar problemas con los antitrampas.</li>
           <li>Temperatura, frecuencia y consumo de la gráfica: solo en NVIDIA. En AMD e Intel se muestra el uso.</li>
-        </ul>
+        </ul></details>
       </section>
     </div>`;
 }
@@ -179,7 +182,7 @@ function gameModeBlock() {
         <label class="switch"><input type="checkbox" data-gm="enabled" ${s.enabled ? "checked" : ""} aria-label="Activar el modo juego automático" /><span></span></label>
       </div>
       ${g.active ? `<p class="gm-active">Activo ahora: ${esc(g.active)}</p>` : ""}
-      <div class="gm-opts ${s.enabled ? "" : "off"}">
+      ${s.enabled ? `<div class="gm-opts">
         <label class="ov-check"><input type="checkbox" data-gm="power" ${s.power ? "checked" : ""} /> Poner el plan de energía de máximo rendimiento mientras juegas</label>
         <label class="ov-check"><input type="checkbox" data-gm="overlay" ${s.overlay ? "checked" : ""} /> Mostrar las estadísticas al empezar a jugar</label>
         <h3>Cerrar mientras juegas</h3>
@@ -187,7 +190,7 @@ function gameModeBlock() {
           ${apps.size ? [...apps].map(([exe, title]) => `<label class="chip ${s.closeApps.includes(exe) ? "on" : ""}"><input type="checkbox" data-gm-app="${esc(exe)}" ${s.closeApps.includes(exe) ? "checked" : ""} />${esc(title)}</label>`).join("") : `<span class="muted small">Abre los programas que quieras cerrar al jugar (Discord, navegador…) y vuelve aquí.</span>`}
         </div>
         <label class="ov-check"><input type="checkbox" data-gm="reopen" ${s.reopen ? "checked" : ""} /> Volver a abrirlos al cerrar el juego</label>
-      </div>
+      </div>` : ""}
     </section>`;
 }
 
@@ -393,7 +396,7 @@ const VIEWS: Record<View, () => string> = {
       </header>
       ${games?.length === 0 ? `<div class="empty"><span class="empty-ic">${icon.game}</span><p>No se ha encontrado ningún juego de Steam, Epic o Riot en este PC.</p></div>` : ""}
       ${games?.length ? centralBlock(games) : ""}
-      ${games?.length ? cleanBlock() : ""}
+      ${games?.length ? globalRows() : ""}
       ${games?.length ? gamesToolbar(games) : ""}
       <div class="games">
         ${games
@@ -548,7 +551,7 @@ function gameDetail(g: Game) {
       <div class="game-head-main">
         <h1>${esc(g.name)}</h1>
         <p class="sub">${gameMeta(g)}${d ? ` · ${KIND[d.kind]}` : ""}</p>
-        ${d ? `<p class="fps-line"><strong>~${d.estFinal} FPS</strong> <span class="muted">estimados con estos ajustes · objetivo ${d.target} · limita ${d.bottleneck === "cpu" ? "el procesador" : "la gráfica"}</span></p>` : ""}
+        ${d ? `<p class="fps-line">${d.measuredFps ? `<strong>${d.measuredFps} FPS</strong> <span class="muted">medidos en tu última partida ·</span> ` : ""}<span class="muted">Lo que más limita aquí: ${d.bottleneck === "cpu" ? "el procesador" : "la gráfica"}</span></p>` : ""}
         <div class="game-actions">
           <fieldset class="seg" aria-label="Objetivo">
             ${GOALS.map(([v, l]) => `<label><input type="radio" name="goal" value="${v}" ${state.goal === v ? "checked" : ""} /><span>${l}</span></label>`).join("")}
@@ -568,6 +571,13 @@ function gameDetail(g: Game) {
   `;
 }
 
+// Potencia de una pieza frente a lo que pide el juego (los requisitos sí son datos reales; los FPS estimados no se enseñan).
+function power(p: Part) {
+  if (!p.demand) return "El juego no publica requisitos";
+  const r = p.score / Math.max(p.demand.score, 1);
+  return r >= 1.5 ? "Le sobra potencia para este juego" : r >= 0.9 ? "Cumple lo que pide el juego" : "Por debajo de lo que pide el juego";
+}
+
 // Pestaña principal: el cálculo resumido, los avisos y la tabla de ajustes.
 function recPanel(g: Game, d: GameDetail, editable: boolean) {
   const part = (title: string, p: Part, limits: boolean) => `
@@ -575,9 +585,10 @@ function recPanel(g: Game, d: GameDetail, editable: boolean) {
         <span class="muted">${title}${limits ? ` <span class="tag">Limita</span>` : ""}</span>
         <strong title="${esc(p.name)}">${esc(p.name.replace(/\(R\)|\(TM\)|®|™/g, "").replace(/^\d+th Gen /, ""))}</strong>
         <span class="muted">Potencia ${p.score} · ${p.demand ? `el juego pide ${p.demand.score}` : "sin requisitos publicados"}</span>
-        <span class="muted">Daría ~${p.fps} FPS</span>
+        <span class="muted">${power(p)}</span>
       </div>`;
   const alerts = d.factors.filter((f) => f.effect === "penalty" || f.effect === "warning");
+  const lowered = d.settings.filter((s) => s.change).length;
   const guide = !editable;
   const rows = d.settings.map((s) => `
     <div class="settings-row ${guide ? "guide" : ""} ${!guide && !s.change ? "same" : ""}">
@@ -592,17 +603,17 @@ function recPanel(g: Game, d: GameDetail, editable: boolean) {
       ${part("Gráfica", d.gpu, d.bottleneck === "gpu")}
       ${part("Procesador", d.cpu, d.bottleneck === "cpu")}
       <div>
-        <span class="muted">FPS estimados</span>
-        <strong>~${d.estMax} al máximo → ~${d.estFinal}</strong>
-        <span class="muted">Objetivo: ${d.target} FPS</span>
+        <span class="muted">Ajustes que cambian</span>
+        <strong>${lowered} de ${d.settings.length}</strong>
+        <span class="muted">${d.measuredFps ? `Medidos en tu última partida: ${d.measuredFps} FPS` : "Para ver tus FPS reales, usa las estadísticas en el juego"}</span>
         <button class="link" data-tab="game:calc">Ver todo lo que se ha tenido en cuenta</button>
       </div>
     </div>
     ${alerts.map((f) => `<p class="notice">${icon.warning}<span><strong>${esc(f.label)}:</strong> ${esc(f.note)}</span></p>`).join("")}
-    ${d.reached ? "" : `<p class="notice">${icon.warning}<span>${d.bottleneck === "cpu"
-      ? `Tu procesador no llega a ${d.target} FPS en este juego aunque se bajen los ajustes que lo cargan. Cierra programas en segundo plano mientras juegas.`
-      : `Ni bajando estos ajustes se llega a ${d.target} FPS. Prueba a activar DLSS o FSR en el juego, o a bajar la resolución.`}</span></p>`}
-    ${d.reached && d.loweredNothing ? `<p class="notice">${icon.check}<span>Con todo al máximo tu PC ya llega a ~${d.estMax} FPS y el objetivo es ${d.target}: por eso no se baja nada. Si quieres más FPS, elige «Más FPS».</span></p>` : ""}
+    ${!d.measuredFps || d.measuredFps >= d.target * 0.9 ? "" : `<p class="notice">${icon.warning}<span>En tu última partida ibas a ${d.measuredFps} FPS. ${d.bottleneck === "cpu"
+      ? `Lo que más limita en este juego es el procesador: cierra programas en segundo plano mientras juegas.`
+      : `Si te va lento, activa el escalado (DLSS o FSR) o baja la resolución.`}</span></p>`}
+    ${d.reached && d.loweredNothing ? `<p class="notice">${icon.check}<span>Con este modo no se baja nada en tu equipo. Si quieres más FPS, elige «Más FPS».</span></p>` : ""}
     ${d.canApply && !d.configFound ? `<p class="notice">${icon.info}<span>Abre ${esc(g.name)} una vez y ciérralo: así crea su archivo de configuración y Gamer Config podrá aplicar esto solo. Mientras, puedes ponerlo a mano en el menú.</span></p>` : ""}
     <div class="settings">
       <div class="settings-row th ${guide ? "guide" : ""}">
@@ -627,7 +638,7 @@ function calcPanel(d: GameDetail) {
       ${d.factors.map((f) => `
         <li><span class="f-${f.effect}">${f.effect === "ok" ? icon.check : f.effect === "info" ? icon.info : icon.warning}</span><strong>${esc(f.label)}</strong><span>${esc(f.value)}</span><span class="muted">${esc(f.note)}</span></li>`).join("")}
     </ul>
-    <p class="muted small calc-note">Las cifras son estimaciones: se calculan con la potencia de tu gráfica y tu procesador frente a lo que pide el juego, y con el coste típico de cada ajuste según las fuentes.</p>
+    <p class="muted small calc-note">La potencia de cada pieza es aproximada: se compara con lo que pide el juego y con el coste típico de cada ajuste según las fuentes. Para ver tus FPS reales, usa las estadísticas en el juego: con ellas el cálculo se corrige solo.</p>
     ${d.sources.length ? `<p class="sources">Fuentes: ${d.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a>`).join(", ")}</p>` : ""}
     <button class="btn sm" data-act="copy-report">Copiar informe</button>
     <span class="muted small">Para enviarlo si algo no cuadra en tu PC o en el de otra persona.</span>`;
@@ -984,7 +995,7 @@ function centralBlock(games: Game[]) {
     <section class="block central">
       <div class="row-main">
         <h2>Configuración para todos los juegos</h2>
-        <span class="muted">Elige un modo y se aplica a cada juego con sus propios ajustes, calculados para tu gráfica, tu procesador y lo que pide ese juego. ${auto} de ${games.length} se pueden configurar solos; los demás tienen su guía.</span>
+        <span class="muted">Cada juego recibe sus propios ajustes, calculados para tu PC. ${auto} de ${games.length} se configuran solos; el resto tiene su guía.</span>
       </div>
       <div class="central-actions">
         <fieldset class="seg" aria-label="Modo para todos los juegos">
@@ -997,24 +1008,80 @@ function centralBlock(games: Game[]) {
     </section>`;
 }
 
-function cleanBlock() {
+// Tecnologías de imagen: como el panel global de la app de NVIDIA, pero para cualquier marca.
+// Solo se pueden elegir las que tu gráfica admite.
+function techBlock() {
+  const t = state.tech;
+  if (!t) return "";
+  const { settings: s, caps: c } = t;
+  const seg = (name: keyof TechSettings, label: string, opts: [string, string, boolean][], disabled = false) =>
+    `<fieldset class="seg" aria-label="${label}" ${disabled ? "disabled" : ""}>${opts.map(([v, l, ok]) =>
+      `<label class="${ok ? "" : "na"}" ${ok ? "" : 'title="Tu gráfica no lo admite"'}><input type="radio" name="tech-${name}" value="${v}" ${s[name] === v ? "checked" : ""} ${ok ? "" : "disabled"} /><span>${l}</span></label>`).join("")}</fieldset>`;
+  const d = t.detected;
+  const dlssUsed = c.dlss && (s.upscaler === "auto" || s.upscaler === "dlss");
+  const name = (opts: [string, string, boolean][], v: string) => opts.find(([k]) => k === v)?.[1] ?? v;
+  const UP: [string, string, boolean][] = [["auto", `Automático (${d.upscaler})`, true], ["dlss", "DLSS", c.dlss], ["fsr", "FSR", c.fsr], ["xess", "XeSS", c.xess], ["off", "Apagado", true]];
+  const QU: [string, string, boolean][] = [["auto", "Automática", true], ["calidad", "Calidad", true], ["equilibrado", "Equilibrado", true], ["rendimiento", "Rendimiento", true], ["nativo", "Nativa", true]];
+  const MO: [string, string, boolean][] = [["auto", "Automático (Transformer)", true], ["transformer", "Transformer (DLSS 4)", true], ["cnn", "CNN", true]];
+  const FG: [string, string, boolean][] = [["auto", `Automática (${d.frameGen})`, true], ["off", "Apagada", true], ["2x", "2x", c.dlssFg || c.fsrFg], ["3x", "3x", c.dlssMfg], ["4x", "4x", c.dlssMfg]];
+  const LA: [string, string, boolean][] = [["auto", "Según el modo", true], ["off", "Apagada", c.reflex], ["on", "Activada", c.reflex], ["boost", "Activada + Boost", c.reflex]];
+  const summary = [
+    s.upscaler === "auto" ? d.upscaler : name(UP, s.upscaler),
+    s.upscaler !== "off" && s.quality !== "auto" ? name(QU, s.quality) : "",
+    dlssUsed ? (s.dlssModel === "cnn" ? "CNN" : "Transformer") : "",
+    s.frameGen === "auto" ? "fotogramas automáticos" : s.frameGen === "off" ? "sin generar fotogramas" : `fotogramas ${s.frameGen}`,
+    c.reflex && s.latency !== "off" ? "Reflex" : "",
+  ].filter(Boolean).join(" · ");
+  const row = (label: string, control: string) => `<div class="tech-row"><span>${label}</span>${control}</div>`;
   return `
-    <section class="block central">
+    <div class="g-row">
       <div class="row-main">
-        <h2>Limpieza tras actualizar</h2>
-        <span class="muted">Cuando un juego se actualiza, se borran los archivos sobrantes que deja el parche (descargas a medias, versiones anteriores) para que no crezca de tamaño. Nunca se tocan partidas, ajustes ni mods. También puedes limpiar un juego a mano desde su ficha.</span>
+        <strong>Tecnologías de imagen</strong>
+        <span class="muted">${esc(summary)}</span>
       </div>
-      <div class="central-actions">
-        <button class="btn ${state.cleanAuto ? "primary" : ""}" data-act="clean-auto" aria-pressed="${state.cleanAuto}">
-          ${icon.check}<span>${state.cleanAuto ? "Automática: activada" : "Automática: apagada"}</span>
-        </button>
+      <button class="btn sm" data-act="tech-open" aria-expanded="${state.techOpen}">${state.techOpen ? "Cerrar" : "Ajustar"}</button>
+    </div>
+    ${state.techOpen ? `
+      <div class="tech-panel">
+        <p class="muted small">Detectadas por tus componentes (${esc(t.gpu)}, ${esc(d.screen)}). Se usan en los juegos que tienen esa opción. Lo atenuado no lo admite tu gráfica.</p>
+        ${row("Escalado", seg("upscaler", "Escalado", UP))}
+        ${row("Calidad del escalado", seg("quality", "Calidad del escalado", QU, s.upscaler === "off"))}
+        ${row("Tipo de DLSS", seg("dlssModel", "Tipo de DLSS", MO, !dlssUsed))}
+        ${row("Generación de fotogramas", seg("frameGen", "Generación de fotogramas", FG))}
+        ${row("Baja latencia", seg("latency", "Baja latencia", LA, !c.reflex))}
+        <p class="muted small">La generación de fotogramas añade algo de retraso: en automático solo se activa si el juego ya va a 50 FPS o más y nunca en el modo «Más FPS». ${c.reflex ? "" : esc(d.latency) + "."}</p>
+      </div>` : ""}`;
+}
+
+// Ajustes para todos los juegos que no son el modo: filas compactas para no tapar la lista de juegos.
+function globalRows() {
+  return `
+    <section class="block globals">
+      ${techBlock()}
+      <div class="g-row">
+        <div class="row-main">
+          <strong>Limpieza tras actualizar</strong>
+          <span class="muted">Borra los archivos sobrantes de los parches. Nunca toca partidas, ajustes ni mods.</span>
+        </div>
+        <label class="switch"><input type="checkbox" data-act-change="clean-auto" ${state.cleanAuto ? "checked" : ""} aria-label="Limpieza automática tras actualizar" /><span></span></label>
       </div>
     </section>`;
 }
 
-async function toggleCleanAuto() {
+async function techSet(patch: Partial<TechSettings>) {
   try {
-    state.cleanAuto = (await api.cleanSet({ auto: !state.cleanAuto })).auto;
+    if (state.tech) state.tech.settings = await api.techSet(patch);
+    state.detail = null; // el cálculo de cada juego cambia
+    toast("Tecnologías guardadas: se usan al aplicar cualquier juego.");
+  } catch (e) {
+    toast(errorText(e), true);
+  }
+  rerender();
+}
+
+async function toggleCleanAuto(want = !state.cleanAuto) {
+  try {
+    state.cleanAuto = (await api.cleanSet({ auto: want })).auto;
     toast(state.cleanAuto ? "Se limpiará solo tras cada actualización." : "Ya no se limpia solo: te avisaremos cuando haya archivos sobrantes.");
   } catch (e) {
     toast(errorText(e), true);
@@ -1137,6 +1204,7 @@ document.addEventListener("click", (e) => {
   else if (d.act === "apply-game") applyGame();
   else if (d.act === "clean-game") cleanGame();
   else if (d.act === "clean-auto") toggleCleanAuto();
+  else if (d.act === "tech-open") { state.techOpen = !state.techOpen; rerender(); }
   else if (d.act === "restore-game") restoreGame();
   else if (d.act === "copy-report" && state.game) {
     api.copyReport(state.game.id, state.goal).then(
@@ -1206,6 +1274,8 @@ document.addEventListener("change", (e) => {
   if (t.dataset.ovOpacity != null) { overlaySet({ opacity: Number(t.value) }); return; }
   if (t.dataset.ovHotkey != null) { overlaySet({ hotkey: (t as unknown as HTMLSelectElement).value }); return; }
   if (t.dataset.ovBackground != null) { overlaySet({ background: t.checked }); return; }
+  if (t.dataset.actChange === "clean-auto") { toggleCleanAuto(t.checked); return; }
+  if (t.name.startsWith("tech-")) { techSet({ [t.name.slice(5)]: t.value } as Partial<TechSettings>); return; }
   if (t.name === "goal") {
     state.goal = t.value as Goal;
     safeSet("goal", state.goal);
@@ -1242,6 +1312,7 @@ api.onGamesCleaned((results) => {
 
 /* ---------- Arranque ---------- */
 api.cleanGet().then((c) => { state.cleanAuto = c.auto; }, () => {});
+api.techGet().then((t) => { state.tech = t; if (state.view === "juegos" && !state.game) rerender(); }, () => {});
 
 go("panel");
 api.onUpdateReady(updateBanner);

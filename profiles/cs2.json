@@ -1,6 +1,6 @@
 {
   "id": "cs2",
-  "version": 1,
+  "version": 2,
   "name": "Counter-Strike 2",
   "games": ["steam-730"],
   "names": ["Counter-Strike 2"],
@@ -23,8 +23,8 @@
       "levels": [["0", "Bajo", 0], ["1", "Alto", 8]] },
     { "key": "setting.videocfg_texture_detail", "label": "Texturas", "why": "No cuesta FPS mientras quepa en la memoria de la gráfica.",
       "levels": [["0", "Bajas", 0, { "vram": 1 }], ["1", "Medias", 0, { "vram": 2 }], ["2", "Altas", 0, { "vram": 3 }]] },
-    { "key": "setting.r_low_latency", "label": "NVIDIA Reflex", "requires": "nvidia", "why": "Menos retraso entre el ratón y la pantalla, sin perder FPS.",
-      "levels": [["0", "Desactivado", 0], ["1", "Activado", 0], ["2", "Activado + Boost", 0]],
+    { "key": "setting.r_low_latency", "label": "NVIDIA Reflex", "requires": "nvidia", "latency": true, "why": "Menos retraso entre el ratón y la pantalla, sin perder FPS.",
+      "levels": [["0", "Desactivado", 0, { "mode": "off" }], ["1", "Activado", 0, { "mode": "on" }], ["2", "Activado + Boost", 0, { "mode": "boost" }]],
       "fixed": { "fps": "1", "equilibrado": "1", "calidad": "1" } }
   ]
 }

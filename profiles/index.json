@@ -13,7 +13,7 @@
     {
       "id": "deadlock",
       "file": "deadlock.json",
-      "version": 4
+      "version": 7
     },
     {
       "id": "warframe",
@@ -48,7 +48,7 @@
     {
       "id": "cs2",
       "file": "cs2.json",
-      "version": 1
+      "version": 2
     },
     {
       "id": "gtav",
@@ -63,7 +63,7 @@
     {
       "id": "marvelrivals",
       "file": "marvelrivals.json",
-      "version": 1
+      "version": 3
     }
   ]
 }

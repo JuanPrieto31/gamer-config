@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld("afina", {
   cleanRun: call("clean-run"),
   cleanGet: call("clean-get"),
   cleanSet: call("clean-set"),
+  techGet: call("tech-get"),
+  techSet: call("tech-set"),
   applyGame: call("game-apply"),
   restoreGame: call("game-restore"),
   copyReport: call("copy-report"),

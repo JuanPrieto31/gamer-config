@@ -9,6 +9,7 @@ import * as overlay from "./overlay.js";
 import * as gamemode from "./gamemode.js";
 import * as network from "./network.js";
 import * as cleanup from "./cleanup.js";
+import * as tech from "./tech.js";
 import updater from "electron-updater";
 
 const { autoUpdater } = updater;
@@ -158,6 +159,11 @@ const handlers = {
   },
   "clean-get": () => cleanup.getSettings(),
   "clean-set": (patch) => cleanup.setSettings(patch),
+  "tech-get": async () => {
+    const hw = await system.hardware();
+    return { settings: tech.getSettings(), caps: tech.capabilities(hw), gpu: hw.gpu, detected: tech.detected(hw) };
+  },
+  "tech-set": (patch) => tech.setSettings(patch),
   "game-detail": (id, goal) => optimize.detail(gameById(id), goal),
   "game-apply": async (id, goal) => {
     const msg = await optimize.apply(gameById(id), goal);

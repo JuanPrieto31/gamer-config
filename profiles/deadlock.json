@@ -1,6 +1,6 @@
 {
   "id": "deadlock",
-  "version": 4,
+  "version": 7,
   "name": "Deadlock",
   "games": [
     "steam-1422450"
@@ -26,9 +26,159 @@
     {
       "name": "EVEzone",
       "url": "https://evezone.evetech.co.za/game-desk/best-deadlock-pc-settings-for-maximum-fps-in-2026"
+    },
+    {
+      "name": "NVIDIA (ajustes óptimos: el escalado va activado en todos los pasos)",
+      "url": "https://www.nvidia.com/en-us/geforce/technologies/dlss/"
     }
   ],
   "settings": [
+    {
+      "key": "setting.r_citadel_dlss_settings_mode",
+      "label": "Escalado (DLSS)",
+      "upscaler": true,
+      "visual": 1,
+      "why": "Dibuja a menos resolución y la reconstruye con IA: es lo que más FPS da por calidad perdida.",
+      "levels": [
+        [
+          "1",
+          "DLSS Rendimiento",
+          0,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "4",
+              "setting.mat_viewportscale": "0.500000"
+            },
+            "mode": "rendimiento"
+          }
+        ],
+        [
+          "2",
+          "DLSS Equilibrado",
+          10,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "4",
+              "setting.mat_viewportscale": "0.580046"
+            },
+            "visual": 4,
+            "mode": "equilibrado"
+          }
+        ],
+        [
+          "3",
+          "DLSS Calidad",
+          21,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "4",
+              "setting.mat_viewportscale": "0.666667"
+            },
+            "match": [
+              "0"
+            ],
+            "visual": 3,
+            "mode": "calidad"
+          }
+        ],
+        [
+          "4",
+          "DLAA (resolución nativa)",
+          70,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "4",
+              "setting.mat_viewportscale": "1.000000"
+            },
+            "visual": 1,
+            "mode": "nativo"
+          }
+        ]
+      ],
+      "tech": "dlss"
+    },
+    {
+      "key": "setting.mat_viewportscale",
+      "label": "Escalado (FSR 2)",
+      "upscaler": true,
+      "visual": 2,
+      "why": "Dibuja a menos resolución y la reescala: muchos más FPS, algo menos nítido.",
+      "levels": [
+        [
+          "0.500000",
+          "FSR 2 Rendimiento",
+          0,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "2"
+            },
+            "mode": "rendimiento"
+          }
+        ],
+        [
+          "0.588235",
+          "FSR 2 Equilibrado",
+          10,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "2"
+            },
+            "visual": 5,
+            "mode": "equilibrado"
+          }
+        ],
+        [
+          "0.666667",
+          "FSR 2 Calidad",
+          21,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "2"
+            },
+            "visual": 4,
+            "mode": "calidad"
+          }
+        ],
+        [
+          "1.000000",
+          "Desactivado (resolución nativa)",
+          70,
+          {
+            "also": {
+              "setting.r_citadel_upscaling": "0"
+            },
+            "visual": 2,
+            "mode": "nativo",
+            "off": true
+          }
+        ]
+      ],
+      "tech": "fsr"
+    },
+    {
+      "key": "setting.r_dlss_preset",
+      "label": "Tipo de DLSS",
+      "dlssModel": true,
+      "why": "Transformer (DLSS 4) reconstruye mejor la imagen; CNN es el modelo anterior, algo más ligero en las RTX 20 y 30.",
+      "levels": [
+        [
+          "5",
+          "CNN",
+          0,
+          {
+            "mode": "cnn"
+          }
+        ],
+        [
+          "10",
+          "Transformer (DLSS 4)",
+          0,
+          {
+            "mode": "transformer"
+          }
+        ]
+      ]
+    },
     {
       "key": "setting.r_citadel_shadow_quality",
       "label": "Sombras",
@@ -189,22 +339,35 @@
       "levels": [
         [
           "0",
-          "Desactivado"
+          "Desactivado",
+          0,
+          {
+            "mode": "off"
+          }
         ],
         [
           "1",
-          "Activado"
+          "Activado",
+          0,
+          {
+            "mode": "on"
+          }
         ],
         [
           "2",
-          "Activado + Boost"
+          "Activado + Boost",
+          0,
+          {
+            "mode": "boost"
+          }
         ]
       ],
       "fixed": {
         "fps": "2",
         "equilibrado": "1",
         "calidad": "1"
-      }
+      },
+      "latency": true
     }
   ],
   "demandCpu": "Intel Core i5-7500 / AMD Ryzen 5 1600",

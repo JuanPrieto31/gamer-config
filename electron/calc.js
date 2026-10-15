@@ -99,8 +99,15 @@ export function factors(hw, demand, ctx) {
   return { gpu, cpu, list };
 }
 
+// requires: marca de la gráfica ("nvidia" | "amd" | "intel"). Las tecnologías (DLSS, FSR, XeSS…) las elige tech.js.
+export const supports = (s, hw) => !s.requires || s.requires === hw.vendor;
+
 /**
- * settings: [{ key, levels:[{value,label,cost,cpu?,visual?,vram?}], visual?, fixed?, requires? }]
+ * settings: [{ key, levels:[{value,label,cost,cpu?,visual?,vram?,also?}], visual?, fixed?, fixedLevel?, requires?, upscaler? }]
+ * fixedLevel: nivel decidido por el usuario (tech.js). En un escalado sigue contando para los FPS, pero no se toca.
+ * upscaler: escalado (DLSS/FSR/TSR). El nivel más alto es la resolución nativa; los requisitos y el "Alto" de
+ * referencia se miden en nativa, así que el escalado no cuenta en la referencia: es FPS extra (lo primero que
+ * recorta NVIDIA en sus ajustes óptimos, porque es lo que más FPS da por calidad perdida).
  * hw: { score, cpuScore, vendor, vramGb, refresh, pixels }
  * demand: { gpu, cpu } puntuaciones que pide el juego
  * mult: { gpu, cpu } multiplicadores del resto de especificaciones (ver factors)
@@ -114,8 +121,10 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
 
   const picks = new Map();
   const tunable = [];
-  for (const s of settings.filter((s) => !s.requires || s.requires === hw.vendor)) {
-    if (s.fixed) {
+  for (const s of settings.filter((s) => supports(s, hw))) {
+    if (s.fixedLevel && !s.upscaler) {
+      picks.set(s.key, s.fixedLevel);
+    } else if (s.fixed) {
       const v = String(s.fixed[goal]).replace("{refresh}", String(hw.refresh || 60));
       picks.set(s.key, s.levels?.find((l) => String(l.value) === v) ?? { value: v, label: v });
     } else if (s.levels.some((l) => l.vram != null)) {
@@ -125,14 +134,28 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
       const fit = s.levels.filter((l) => (l.vram ?? 0) * scale <= (hw.vramGb ?? 2));
       picks.set(s.key, fit.at(-1) ?? s.levels[0]);
     } else {
-      tunable.push({ s, i: s.levels.length - 1 });
+      const lock = s.fixedLevel ? s.levels.indexOf(s.fixedLevel) : -1;
+      tunable.push({ s, i: lock >= 0 ? lock : s.levels.length - 1, lock: lock >= 0 });
     }
   }
 
   let costScale = 1;
-  const load = (field) => 1 + tunable.reduce((t, x) => t + (x.s.levels[x.i][field] ?? 0) / 100, 0) * (field === "cost" ? costScale : 1);
-  const setAll = (pos) => tunable.forEach((x) => { x.i = Math.round((x.s.levels.length - 1) * pos); });
+  // El escalado multiplica todo el trabajo de la gráfica (menos píxeles para todo lo demás); en nativa vale ×1.
+  const load = (field) => {
+    let sum = 0;
+    let up = 1;
+    for (const x of tunable) {
+      const c = (x.s.levels[x.i][field] ?? 0) / 100;
+      if (x.s.upscaler && field === "cost") up *= (1 + c) / (1 + (x.s.levels.at(-1).cost ?? 0) / 100);
+      else sum += c;
+    }
+    return (1 + sum * (field === "cost" ? costScale : 1)) * up;
+  };
   const top = tunable.map((x) => x.i);
+  // La referencia ("Alto") siempre en nativa; un escalado fijado por el usuario se queda donde está en lo demás.
+  const setAll = (pos) => tunable.forEach((x, n) => {
+    x.i = x.s.upscaler && pos > 0 ? x.s.levels.length - 1 : x.lock ? top[n] : Math.round((x.s.levels.length - 1) * pos);
+  });
   // Calibración: en los benchmarks, pasar un juego de Alto a Bajo suele dar ×1,7 FPS (de ×1,5 a ×2,2).
   // Si los costes del perfil suman menos, se escalan todos por igual (mantienen su peso relativo entre ajustes);
   // si no, en PCs modestos todo acababa al mínimo sin llegar al objetivo.
@@ -179,7 +202,7 @@ export function solve(settings, hw, demand, goal, mult = { gpu: 1, cpu: 1 }, opt
     const before = now().fps;
     let best = null;
     for (const x of tunable) {
-      if (x.i === 0) continue;
+      if (x.i === 0 || x.lock) continue;
       x.i--;
       const gain = now().fps - before; // FPS reales que da bajar este paso
       x.i++;

@@ -49,6 +49,7 @@ export interface GameDetail {
   target: number;
   reached: boolean;
   loweredNothing: boolean; // con todo al máximo ya se llega al objetivo
+  measuredFps?: number | null; // FPS medidos en la última partida (estadísticas en el juego); los estimados no se enseñan
   canApply: boolean;
   configFound: boolean;
   hasBackup: boolean;
@@ -88,6 +89,11 @@ export interface OverlayState { settings: OverlaySettings; visible: boolean; fps
 
 export interface GameModeSettings { enabled: boolean; power: boolean; closeApps: string[]; reopen: boolean; overlay: boolean }
 export interface GameModeState { settings: GameModeSettings; active: string | null }
+// Tecnologías de imagen (configuración global para todos los juegos)
+export interface TechSettings { upscaler: "auto" | "dlss" | "fsr" | "xess" | "off"; quality: "auto" | "calidad" | "equilibrado" | "rendimiento" | "nativo"; dlssModel: "auto" | "transformer" | "cnn"; frameGen: "auto" | "off" | "2x" | "3x" | "4x"; latency: "auto" | "off" | "on" | "boost" }
+export interface TechCaps { dlss: boolean; dlssFg: boolean; dlssMfg: boolean; fsr: boolean; fsrFg: boolean; xess: boolean; xessNative: boolean; reflex: boolean; fsr4: boolean; gen: number }
+export interface TechDetected { upscaler: string; dlssModel: string; frameGen: string; latency: string; screen: string }
+export interface TechState { settings: TechSettings; caps: TechCaps; gpu: string; detected: TechDetected }
 export interface OpenApp { exe: string; title: string }
 export interface NetRow { id: string; name: string; avg: number | null; jitter: number | null; loss: number; min: number | null }
 export interface NetResult {
@@ -132,6 +138,8 @@ interface Bridge {
   cleanRun(id: string): Promise<CleanResult>;
   cleanGet(): Promise<{ auto: boolean }>;
   cleanSet(patch: { auto: boolean }): Promise<{ auto: boolean }>;
+  techGet(): Promise<TechState>;
+  techSet(patch: Partial<TechSettings>): Promise<TechSettings>;
   onGamesCleaned(cb: (results: CleanedGame[]) => void): void;
   applyGame(id: string, goal: Goal): Promise<string>;
   restoreGame(id: string): Promise<string>;
@@ -168,6 +176,7 @@ const mockOverlay: OverlaySettings = {
 };
 
 const mockGameMode: GameModeSettings = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false };
+const mockTech: TechSettings = { upscaler: "auto", quality: "auto", dlssModel: "auto", frameGen: "auto", latency: "auto" };
 
 // Datos de ejemplo para el navegador.
 const mock: Bridge = {
@@ -280,6 +289,8 @@ const mock: Bridge = {
   async cleanRun() { return { removed: 2, freed: 6.4 * 1024 ** 3 }; },
   async cleanGet() { return { auto: true }; },
   async cleanSet(patch) { return { auto: patch.auto }; },
+  async techGet() { return { settings: { ...mockTech }, caps: { dlss: true, dlssFg: false, dlssMfg: false, fsr: true, fsrFg: true, xess: true, xessNative: false, reflex: true, fsr4: false, gen: 3 }, gpu: "NVIDIA GeForce RTX 3050 6GB Laptop GPU", detected: { upscaler: "DLSS", dlssModel: "Transformer (DLSS 4)", frameGen: "FSR 2x", latency: "NVIDIA Reflex", screen: "1920×1080 a 144 Hz" } }; },
+  async techSet(patch) { Object.assign(mockTech, patch); return { ...mockTech }; },
   async gamemodeGet() { return { settings: { ...mockGameMode }, active: null }; },
   async gamemodeSet(patch) { Object.assign(mockGameMode, patch); return { ...mockGameMode }; },
   async gamemodeApps() { return [{ exe: "discord.exe", title: "Discord" }, { exe: "msedge.exe", title: "Microsoft Edge" }, { exe: "spotify.exe", title: "Spotify" }]; },
