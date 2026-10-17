@@ -20,7 +20,14 @@
   --ok: #2e7a4d;          /* hecho / al día (verde suave, solo para estados) */
   --warn: #a35d00;
   --danger: #c41d12;
-  --shadow: 0 1px 2px rgb(40 50 30 / 0.06), 0 8px 24px -12px rgb(40 50 30 / 0.12);
+  --shadow: 0 1px 1px rgb(26 30 20 / 0.05), 0 8px 20px -12px rgb(26 30 20 / 0.16), 0 2px 6px -3px rgb(26 30 20 / 0.08);
+  /* Profundidad: brillo superior de las superficies, filo de luz, rejilla del fondo, halo rojo y huecos hundidos. */
+  --sheen: rgb(255 255 255 / 0.55);
+  --raise: rgb(255 255 255 / 0.9);
+  --grid: rgb(24 28 18 / 0.025);
+  --glow: rgb(224 84 74 / 0.45);
+  --well: rgb(20 24 16 / 0.06);
+  --tint: rgb(224 84 74 / 0.06);
   color-scheme: light;
 }
 
@@ -37,7 +44,13 @@
     --ok: #8acaa3;
     --warn: #f0a640;
     --danger: #ff5446;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --shadow: 0 1px 0 rgb(0 0 0 / 0.45), 0 16px 34px -18px rgb(0 0 0 / 0.8), 0 3px 10px -4px rgb(0 0 0 / 0.55);
+    --sheen: rgb(255 255 255 / 0.04);
+    --raise: rgb(255 255 255 / 0.06);
+    --grid: rgb(255 255 255 / 0.022);
+    --glow: rgb(224 84 74 / 0.55);
+    --well: rgb(0 0 0 / 0.32);
+    --tint: rgb(224 84 74 / 0.09);
     color-scheme: dark;
   }
 }
@@ -543,3 +556,132 @@ kbd { font: 600 12px/1 Consolas, monospace; padding: 2px 6px; border: 1px solid 
 .cover.icon img { object-fit: contain; padding: 12%; position: relative; z-index: 1; filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.25)); }
 /* Logos (LoL, Roblox, Minecraft...): fondo claro (se ven también los logos negros) teñido con los colores del propio logo, para que la tarjeta se vea llena como una portada. */
 .cover.icon img.bg { position: absolute; z-index: 0; padding: 0; object-fit: cover; transform: scale(1.6); opacity: 0.55; filter: blur(26px) saturate(1.5); }
+
+/* ---------- Profundidad y textura ----------
+   Todo estático (sin animaciones infinitas ni desenfoques): la app no debe gastar GPU mientras juegas.
+   Los tokens --sheen, --raise, --grid, --glow, --well y --tint cambian solos entre claro y oscuro. */
+
+/* Fondo: halo rojo arriba a la derecha y rejilla muy tenue; se ve en los huecos entre tarjetas. */
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 82% -12%, rgb(224 84 74 / 0.10), transparent 62%),
+    radial-gradient(860px 540px at -10% 114%, rgb(224 84 74 / 0.05), transparent 58%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+}
+
+/* Superficies como placas: brillo arriba y un filo de luz interior. */
+.block, .meter, .game, .oem-tool, dialog {
+  background: linear-gradient(180deg, var(--sheen), transparent 46%), var(--surface);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--raise);
+}
+dialog { box-shadow: 0 30px 80px -24px rgb(0 0 0 / 0.6), inset 0 1px 0 var(--raise); }
+.findings { background: linear-gradient(135deg, var(--tint), transparent 58%), var(--surface); }
+
+/* Barra lateral: luz arriba, logo con halo y el apartado activo marcado con una franja roja. */
+.side { background: linear-gradient(180deg, var(--sheen), transparent 30%), var(--side); }
+.mark { box-shadow: 0 6px 14px -6px var(--glow), inset 0 1px 0 rgb(255 255 255 / 0.3); }
+.nav { position: relative; }
+.nav[aria-current="true"] {
+  background: linear-gradient(90deg, var(--tint), transparent 85%), var(--surface);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--raise);
+}
+.nav[aria-current="true"]::before {
+  content: ""; position: absolute; left: -12px; top: 50%; width: 3px; height: 18px;
+  border-radius: 0 3px 3px 0; background: var(--accent); transform: translateY(-50%);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+/* Títulos de tarjeta con una marca roja. */
+h1 { letter-spacing: -0.025em; text-wrap: balance; }
+.block > h2:first-child, .block > .table-head:first-child > h2 { display: flex; align-items: center; gap: 8px; }
+.block > h2:first-child::before, .block > .table-head:first-child > h2::before {
+  content: ""; width: 3px; height: 13px; flex: none; border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-text));
+}
+
+/* Medidores tipo instrumento: filo rojo arriba, icono de marca y barra con color y hueco hundido. */
+.meter { position: relative; overflow: hidden; }
+.meter::before {
+  content: ""; position: absolute; inset: 0 18px auto; height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent); opacity: 0.8;
+}
+.meter-top { font-weight: 500; }
+.meter-top svg { color: var(--accent-text); }
+.bar { height: 6px; border-radius: 999px; box-shadow: inset 0 1px 2px var(--well); }
+.bar i { border-radius: 999px; background: linear-gradient(90deg, var(--accent-text), var(--accent)); }
+.meter.warm .bar i { background: linear-gradient(90deg, var(--warn), #e0902c); }
+.meter.hot .bar i { background: linear-gradient(90deg, var(--warn), var(--danger)); box-shadow: 0 0 9px rgb(255 84 70 / 0.5); }
+
+/* Botones con relieve; el principal con halo rojo. */
+.btn {
+  background: linear-gradient(180deg, var(--sheen), transparent 50%), var(--surface-2);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--raise);
+  transition: background 0.15s, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s, box-shadow 0.15s;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0) scale(0.99); box-shadow: inset 0 2px 4px var(--well); }
+.btn.primary {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent 46%), var(--accent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 8px 18px -8px var(--glow);
+}
+.btn.primary:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.34), 0 12px 24px -8px var(--glow); }
+.btn.primary:active:not(:disabled) { box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.28), 0 4px 10px -8px var(--glow); }
+
+/* Selectores, chips y pestañas: el estado activo se nota más. */
+.seg { box-shadow: inset 0 1px 3px var(--well); }
+.seg label:hover span { color: var(--text); }
+.seg input:checked + span {
+  background: linear-gradient(135deg, var(--tint), transparent), var(--surface);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--raise);
+}
+.chip { background: var(--surface); }
+.chip.on { background: linear-gradient(180deg, rgb(224 84 74 / 0.16), rgb(224 84 74 / 0.05)), var(--surface); box-shadow: inset 0 0 0 1px rgb(224 84 74 / 0.3); }
+.tab[aria-selected="true"] { background: linear-gradient(180deg, transparent 45%, var(--tint)); }
+
+/* Zonas de atención (permiso, configuración global): tinte rojo y franja lateral en vez de marco rojo entero. */
+.perm, .central {
+  position: relative; overflow: hidden;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: linear-gradient(100deg, var(--tint), transparent 55%), linear-gradient(180deg, var(--sheen), transparent 46%), var(--surface);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--raise);
+}
+.perm::before, .central::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); }
+.perm-ic { box-shadow: 0 8px 18px -8px var(--glow), inset 0 1px 0 rgb(255 255 255 / 0.3); }
+
+/* Iconos en cuadro con relieve. */
+.sev, .tool-ic, .empty-ic { box-shadow: inset 0 1px 0 var(--raise), inset 0 0 0 1px var(--well); }
+
+/* Filas: un fondo suave al pasar el ratón para seguir la línea con la vista. */
+.finding, .opt, .g-row { border-radius: 6px; transition: background-color 0.16s; }
+.finding:hover, .opt:hover, .g-row:hover { background-color: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+/* Juegos: sombreado bajo la portada, halo rojo al pasar el ratón y estado con color (fondo opaco para leerse sobre cualquier portada). */
+.cover:has(img)::after { content: ""; position: absolute; inset: 55% 0 0; background: linear-gradient(transparent, rgb(8 10 12 / 0.4)); pointer-events: none; }
+.cover.icon::after { display: none; }
+.game:hover {
+  transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  box-shadow: var(--shadow), 0 18px 32px -20px var(--glow), inset 0 1px 0 var(--raise);
+}
+.game .tag { border: 1px solid var(--line); z-index: 2; }
+.game .tag.status-optimizable { color: var(--accent-text); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.game .tag.status-optimizado { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--surface)); }
+.game .tag.status-guía { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--surface)); }
+.calc > div.limits { background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 14%, transparent), transparent 60%), var(--surface-2); }
+
+/* Rótulos de sección (Para todos los juegos, Tu biblioteca…). */
+.eyebrow { margin-block: 24px 10px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.head + .eyebrow { margin-top: 0; }
+
+/* Estado rápido del equipo en Resumen. */
+.status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.status-card { display: grid; gap: 5px; min-width: 0; padding: 16px; text-align: left; transition: transform 0.15s, border-color 0.15s; }
+.status-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.status-card strong { font-size: 16px; font-weight: 600; }
+.status-card .link { font-size: 12px; }
+.summary-history { margin-top: 16px; }
+@media (max-width: 1000px) { .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .status-grid { grid-template-columns: 1fr; } }
+.status-card .link { margin: 0; }

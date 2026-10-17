@@ -1,10 +1,14 @@
 import "./style.css";
+import "./metal.css"; // tema rock/metal: quitar esta línea vuelve al diseño base
 import { icon } from "./icons";
 import { friendlyName, describe, isVideoSetting } from "./names";
 import { api, errorText } from "./api";
 import type { TechSettings, TechState, GameModeSettings, GameModeState, NetResult, OpenApp, ActionResult, ApplyResult, DriverInfo, DriverItem, OverlayMetric, OverlaySettings, OverlayState, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
 
 type View = "panel" | "sistema" | "juegos" | "juego";
+type WinTab = "opts" | "drivers" | "startup" | "net";
+
+const savedWinTab = safeGet("winTab");
 
 const state = {
   view: "panel" as View,
@@ -19,7 +23,7 @@ const state = {
   driversChecking: false,
   overlay: null as OverlayState | null,
   driversAutoTried: false, // la comprobación automática se intenta una vez por sesión (si falla, queda el botón)
-  winTab: (safeGet("winTab") ?? "opts") as "opts" | "drivers" | "startup" | "net" | "history",
+  winTab: (savedWinTab === "drivers" || savedWinTab === "startup" || savedWinTab === "net" ? savedWinTab : "opts") as WinTab,
   gamemode: null as GameModeState | null,
   openApps: null as OpenApp[] | null,
   net: null as NetResult | null,
@@ -49,14 +53,14 @@ const permitted = () => safeGet("permiso") === "1";
 
 const NAV: [View, string, string][] = [
   ["panel", "Resumen", icon.gauge],
-  ["sistema", "Windows", icon.cpu],
+  ["sistema", "Sistema", icon.cpu],
   ["juegos", "Juegos", icon.game],
   ["juego", "En juego", icon.chart],
 ];
 
 $("#app").innerHTML = `
   <aside class="side">
-    <div class="brand"><span class="mark">${icon.logo}</span>Gamer Config</div>
+    <div class="brand">Gamer Config</div>
     <nav>
       ${NAV.map(([v, label, ic]) => `<button class="nav" data-nav="${v}">${ic}<span>${label}</span></button>`).join("")}
     </nav>
@@ -71,6 +75,11 @@ function go(v: View) {
   render();
   $("#view").focus({ preventScroll: true });
   if (v === "sistema") loadWindows();
+  if (v === "panel") {
+    loadWindows();
+    // La tarjeta del modo juego del Resumen necesita su estado (lectura ligera, sin tocar nada).
+    if (!state.gamemode) api.gamemodeGet().then((g) => { state.gamemode = g; if (state.view === "panel") rerender(); }).catch(() => {});
+  }
   if (v === "juego") loadOverlay();
 }
 
@@ -111,17 +120,17 @@ async function loadOverlay() {
 
 function overlayView() {
   const o = state.overlay;
-  if (!o) return `<header class="head"><div><h1>Estadísticas en el juego</h1></div></header><div class="sk-list">${skel(4)}</div>`;
+  if (!o) return `<header class="head"><div><h1>En juego</h1></div></header><div class="sk-list">${skel(4)}</div>`;
   const s = o.settings;
   const seg = (name: string, opts: [string, string][], cur: string) =>
     `<fieldset class="seg" aria-label="${name}">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${v}" ${cur === v ? "checked" : ""} /><span>${l}</span></label>`).join("")}</fieldset>`;
   return `
     <header class="head">
       <div>
-        <h1>Estadísticas en el juego</h1>
-        <p class="muted">Pulsa <kbd>${esc(s.hotkey)}</kbd> dentro del juego para mostrarlas u ocultarlas. Solo miden mientras se ven: ocultas no gastan nada.</p>
+        <h1>En juego</h1>
+        <p class="sub">Pulsa <kbd>${esc(s.hotkey)}</kbd> dentro del juego para mostrar u ocultar las estadísticas. Solo miden mientras se ven: ocultas no gastan nada.</p>
       </div>
-      <button class="btn ${o.visible ? "" : "primary"}" data-act="overlay-toggle">${o.visible ? "Ocultar" : "Mostrar ahora"}</button>
+      <button class="btn ${o.visible ? "" : "primary"}" data-act="overlay-toggle">${o.visible ? "Ocultar estadísticas" : "Mostrar estadísticas"}</button>
     </header>
     ${o.hotkeyOk ? "" : `<p class="notice warn">Otro programa ya usa ${esc(s.hotkey)}. Elige otro atajo abajo.</p>`}
     ${o.fpsReady ? "" : `
@@ -133,6 +142,7 @@ function overlayView() {
         <button class="btn primary" data-act="overlay-fps">Activar FPS</button>
       </section>`}
     ${gameModeBlock()}
+    <p class="eyebrow">Estadísticas en pantalla</p>
     <div class="ov-layout">
       <section class="block">
         <h2>Qué mostrar</h2>
@@ -318,6 +328,34 @@ const VIEWS: Record<View, () => string> = {
           </dl>` : `<div class="sk-list">${skel(6)}</div>`}
         </section>
       </div>
+
+      <p class="eyebrow">Estado del sistema</p>
+      <section class="status-grid" aria-label="Estado del sistema">
+        <button class="block status-card" data-tab="win:drivers">
+          <span class="muted small">Drivers y BIOS</span>
+          <strong>${!state.drivers ? "Ver estado" : driversPending() ? "Revisando en internet…" : state.drivers.items.some((i) => i.outdated) ? `${state.drivers.items.filter((i) => i.outdated).length} por revisar` : "Al día"}</strong>
+          <span class="link">Ver detalles</span>
+        </button>
+        <button class="block status-card" data-tab="win:startup">
+          <span class="muted small">Programas de inicio</span>
+          <strong>${state.startup ? `${state.startup.filter((a) => a.enabled).length} activados` : "Ver estado"}</strong>
+          <span class="link">Revisar programas</span>
+        </button>
+        <button class="block status-card" data-tab="win:net">
+          <span class="muted small">Conexión</span>
+          <strong>${state.net ? state.net.verdict.some((v) => v.level === "bad") ? "Conviene revisarla" : "Prueba completada" : state.netRunning ? "Probando…" : "Sin probar"}</strong>
+          <span class="link">Abrir prueba de conexión</span>
+        </button>
+        <button class="block status-card" data-nav="juego">
+          <span class="muted small">Modo juego automático</span>
+          <strong>${state.gamemode ? state.gamemode.settings.enabled ? "Activado" : "Desactivado" : "Ver configuración"}</strong>
+          <span class="link">Configurar</span>
+        </button>
+      </section>
+      <section class="block summary-history">
+        <div class="table-head"><h2>Últimos cambios</h2><span class="muted small">Puedes deshacerlos desde aquí</span></div>
+        ${historyList()}
+      </section>
     `;
   },
 
@@ -328,8 +366,8 @@ const VIEWS: Record<View, () => string> = {
     return `
       <header class="head">
         <div>
-          <h1>Windows</h1>
-          <p class="sub">Ajustes del sistema para jugar mejor. Nada se cambia sin tu permiso.</p>
+          <h1>Sistema</h1>
+          <p class="sub">Ajusta Windows y los programas que se abren al encender el PC. Nada se cambia sin tu permiso.</p>
         </div>
       </header>
 
@@ -346,9 +384,8 @@ const VIEWS: Record<View, () => string> = {
       ${tabBar("win", [
         ["opts", "Optimizaciones", w ? `${w.items.filter((i) => i.done).length}/${w.items.length}` : ""],
         ["drivers", "Drivers y BIOS", state.drivers && !driversPending() ? (state.drivers.items.some((i) => i.outdated) ? `${state.drivers.items.filter((i) => i.outdated).length} por actualizar` : "al día") : ""],
-        ["startup", "Inicio de Windows", apps ? `${apps.filter((a) => a.enabled).length}/${apps.length}` : ""],
+        ["startup", "Programas de inicio", apps ? `${apps.filter((a) => a.enabled).length}/${apps.length}` : ""],
         ["net", "Conexión", state.net ? (state.net.verdict.some((v) => v.level === "bad") ? "revisar" : "bien") : ""],
-        ["history", "Historial", state.history ? String(state.history.length) : ""],
       ], state.winTab)}
 
       <section class="block tab-panel">
@@ -360,7 +397,7 @@ const VIEWS: Record<View, () => string> = {
           ${driversList()}`
         : state.winTab === "net" ? netPanel()
         : state.winTab === "startup" ? `
-          <h2>Programas que se inician con Windows</h2>
+          <h2>Programas de inicio</h2>
           ${!apps ? `<div class="sk-list">${skel(5)}</div>`
             : apps.length === 0 ? `<p class="muted">Ningún programa se inicia con Windows.</p>`
             : `<p class="count">${apps.filter((a) => a.enabled).length} de ${apps.length} activados. Desactivar los que no uses hace que el PC arranque antes y deja más RAM libre.</p>
@@ -375,12 +412,9 @@ const VIEWS: Record<View, () => string> = {
                   </label>
                 </li>`).join("")}
             </ul>`}`
-        : state.winTab === "history" ? `
-          <h2>Historial de cambios</h2>
-          ${historyList()}
-          ${can ? `<button class="link" data-act="revoke">Retirar permiso</button>` : ""}`
         : w ? optsBlock(w) : `<div class="sk-list">${skel(5)}</div>`}
       </section>
+      ${can ? `<button class="link" data-act="revoke">Retirar permiso</button>` : ""}
     `;
   },
 
@@ -391,13 +425,11 @@ const VIEWS: Record<View, () => string> = {
       <header class="head">
         <div>
           <h1>Juegos</h1>
-          <p class="sub">${games ? `${games.length} juegos instalados (Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox). Los nuevos aparecen solos.` : "Buscando juegos instalados…"}</p>
+          <p class="sub">${games ? `${games.length} juegos instalados (Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox). Los juegos nuevos se detectan solos.` : "Buscando juegos instalados…"}</p>
         </div>
       </header>
       ${games?.length === 0 ? `<div class="empty"><span class="empty-ic">${icon.game}</span><p>No se ha encontrado ningún juego de Steam, Epic o Riot en este PC.</p></div>` : ""}
-      ${games?.length ? centralBlock(games) : ""}
-      ${games?.length ? globalRows() : ""}
-      ${games?.length ? gamesToolbar(games) : ""}
+      ${games?.length ? `<p class="eyebrow">Para todos los juegos</p>${centralBlock(games)}${globalRows()}<p class="eyebrow">Tu biblioteca</p>${gamesToolbar(games)}` : ""}
       <div class="games">
         ${games
           ? visibleGames(games).map((g) => `
@@ -994,7 +1026,7 @@ function centralBlock(games: Game[]) {
   return `
     <section class="block central">
       <div class="row-main">
-        <h2>Configuración para todos los juegos</h2>
+        <h2>Ajustes de vídeo</h2>
         <span class="muted">Cada juego recibe sus propios ajustes, calculados para tu PC. ${auto} de ${games.length} se configuran solos; el resto tiene su guía.</span>
       </div>
       <div class="central-actions">
@@ -1187,7 +1219,11 @@ document.addEventListener("click", (e) => {
   else if (d.update) openUpdate(d.update);
   else if (d.tab) {
     const [scope, id] = d.tab.split(":");
-    if (scope === "win") { state.winTab = id as typeof state.winTab; safeSet("winTab", id); }
+    if (scope === "win") {
+      state.winTab = id === "drivers" || id === "startup" || id === "net" ? id : "opts";
+      safeSet("winTab", state.winTab);
+      if (state.view !== "sistema") return go("sistema");
+    }
     else state.gameTab = id as GameTab;
     rerender();
   }

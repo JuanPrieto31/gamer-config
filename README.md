@@ -18,6 +18,8 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 - **Modo juego automático**: al abrir un juego pone el plan de máximo rendimiento y cierra los programas que elijas; al cerrarlo, todo vuelve a como estaba.
 - **Prueba de conexión**: ping hasta el router, internet y varias regiones de servidores, para saber si el lag es de tu Wi-Fi, de tu proveedor o del juego.
 - **Libera espacio tras actualizar**: cuando un juego se actualiza (Steam, Epic, Roblox), borra solo los archivos que sobran del parche (descargas a medias, versiones anteriores) para que no crezca de tamaño. Automático (se puede apagar) o a mano desde la ficha del juego, siempre con el juego cerrado.
+- **Resumen como panel de control**: el estado de drivers, programas de inicio, conexión y modo juego de un vistazo, con acceso directo a cada uno, y el historial de cambios con su botón de deshacer.
+- **Diseño rock/metal**: siempre oscuro, en negro, blanco y grises, con títulos en New Rocker y arañazos. Animaciones cortas que no gastan nada mientras juegas y respetan la opción de Windows de reducir animaciones.
 - **Segundo plano y actualizaciones automáticas**: se queda junto al reloj y se actualiza sola desde las versiones de este repositorio.
 
 Antes de cambiar un archivo de un juego se guarda una copia, y todo se puede deshacer.

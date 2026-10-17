@@ -3,7 +3,6 @@ import gauge from "@phosphor-icons/core/assets/regular/gauge.svg?raw";
 import cpu from "@phosphor-icons/core/assets/regular/cpu.svg?raw";
 import game from "@phosphor-icons/core/assets/regular/game-controller.svg?raw";
 import drive from "@phosphor-icons/core/assets/regular/hard-drives.svg?raw";
-import logo from "@phosphor-icons/core/assets/fill/game-controller-fill.svg?raw";
 import power from "@phosphor-icons/core/assets/regular/power.svg?raw";
 import check from "@phosphor-icons/core/assets/regular/check.svg?raw";
 import arrow from "@phosphor-icons/core/assets/regular/arrow-right.svg?raw";
@@ -16,4 +15,4 @@ import restore from "@phosphor-icons/core/assets/regular/clock-counter-clockwise
 import info from "@phosphor-icons/core/assets/regular/info.svg?raw";
 import chart from "@phosphor-icons/core/assets/regular/chart-line.svg?raw";
 
-export const icon = { gauge, cpu, game, drive, logo, power, check, arrow, warning, shield, refresh, memory, gpu, restore, info, chart };
+export const icon = { gauge, cpu, game, drive, power, check, arrow, warning, shield, refresh, memory, gpu, restore, info, chart };

@@ -58,6 +58,9 @@ Con `--pruebas`, la app usa otra carpeta de datos (`%APPDATA%\Gamer Config (prue
 | `src/main.ts` | Toda la interfaz |
 | `src/api.ts` | Tipos y puente con el proceso principal (con datos de ejemplo para `npm run dev` en el navegador) |
 | `src/names.ts` | Nombres en español y explicación de cada ajuste de vídeo |
+| `src/style.css` + `src/metal.css` | Estilos base y, encima, el tema rock/metal (siempre oscuro, negro/blanco/grises, arañazos). Quitar el `import "./metal.css"` de `main.ts` vuelve al diseño base |
+| `src/fonts/` | New Rocker (OFL, con su licencia): títulos, menú, botones y rótulos. El texto de lectura va en Segoe UI |
+| `src/logo.svg` + `build/make-icon.js` | Logo GG (New Rocker convertido a trazos). `npx electron build/make-icon.js` genera `build/icon.png`, `build/icon.ico` y `public/favicon.svg`. Dentro de la app no se muestra: solo en los iconos |
 | `profiles/` | Perfiles por juego + `engines/` (Unreal y genérico) + `index.json` |
 
 ## Perfiles de juegos (`profiles/`)

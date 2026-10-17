@@ -1,4 +1,4 @@
-// Genera build/icon.png e build/icon.ico a partir del logo (Phosphor "game-controller" sobre el rojo de la marca).
+// Genera build/icon.png, build/icon.ico y public/favicon.svg a partir del logo (src/logo.svg: monograma GG) sobre una placa negra metálica.
 // Uso: npx electron build/make-icon.js
 import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
@@ -6,17 +6,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const ICON = path.join(dir, "../node_modules/@phosphor-icons/core/assets/fill/game-controller-fill.svg");
-const BG = "#e0544a"; // --accent
-const INK = "#2a0705"; // --accent-ink
+const ICON = path.join(dir, "../src/logo.svg");
+const INK = "#f2f2f2"; // el logo, en blanco como en la app
 
 function svg(size) {
   const inner = fs.readFileSync(ICON, "utf8").match(/<svg[^>]*>([\s\S]*)<\/svg>/)[1];
   const r = size * 0.22;
   const pad = size * 0.1;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <rect width="${size}" height="${size}" rx="${r}" fill="${BG}"/>
-    <g transform="translate(${pad} ${pad}) scale(${(size - pad * 2) / 256})" fill="${INK}">${inner}</g>
+    <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3a3a"/><stop offset="0.6" stop-color="#121212"/><stop offset="1" stop-color="#050505"/></linearGradient></defs>
+    <rect width="${size}" height="${size}" rx="${r}" fill="url(#bg)"/>
+    <rect x="${size * 0.01}" y="${size * 0.01}" width="${size * 0.98}" height="${size * 0.98}" rx="${r * 0.95}" fill="none" stroke="#6a6a6a" stroke-width="${Math.max(1, size * 0.012)}"/>
+    <g transform="translate(${pad} ${pad}) scale(${(size - pad * 2) / 256})" fill="${INK}" color="${INK}">${inner}</g>
   </svg>`;
 }
 
@@ -66,6 +67,8 @@ app.whenReady().then(async () => {
   for (const size of sizes) pngs.push({ size, data: await render(win, size) });
   fs.writeFileSync(path.join(dir, "icon.png"), pngs.at(-1).data);
   fs.writeFileSync(path.join(dir, "icon.ico"), ico(pngs));
+  fs.mkdirSync(path.join(dir, "../public"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "../public/favicon.svg"), svg(64)); // icono de la pestaña: la misma placa en vectorial
   console.log("icon.png e icon.ico generados:", sizes.join(", "), "px");
   app.exit(0);
 });
