@@ -567,7 +567,7 @@ export async function detail(game, goal) {
 const safeId = (id) => id.replace(/[^a-z0-9._-]/gi, "_");
 
 async function runningProcesses() {
-  const { stdout } = await run("tasklist", ["/FO", "CSV", "/NH"], { windowsHide: true });
+  const { stdout } = await run("tasklist", ["/FO", "CSV", "/NH"], { windowsHide: true, timeout: 15000 });
   return new Set([...stdout.matchAll(/^"([^"]+)"/gm)].map((m) => m[1].toLowerCase()));
 }
 

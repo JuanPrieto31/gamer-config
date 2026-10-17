@@ -104,7 +104,7 @@ async function runningIn(dir) {
 
 async function processRunning(exe) {
   try {
-    const { stdout } = await run("tasklist", ["/FI", `IMAGENAME eq ${exe}`, "/NH"], { windowsHide: true });
+    const { stdout } = await run("tasklist", ["/FI", `IMAGENAME eq ${exe}`, "/NH"], { windowsHide: true, timeout: 15000 });
     return stdout.toLowerCase().includes(exe.toLowerCase());
   } catch { return true; }
 }

@@ -18,7 +18,8 @@ async function ps(script) {
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
       `$ErrorActionPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.Encoding]::UTF8;${script}`],
-    { windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+    // Con límite: si WMI se cuelga (pasa al arrancar juegos), falla en vez de dejar la app esperando para siempre.
+    { windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 60000 },
   );
   return stdout.trim() ? JSON.parse(stdout) : null;
 }
@@ -133,7 +134,7 @@ function gameScreen(r) {
 // Potencia máxima de una gráfica NVIDIA de portátil (W): la misma RTX 4060 Laptop va de 45 W a 140 W según el modelo.
 let wattsCache = null;
 function nvidiaWatts() {
-  wattsCache ??= run("nvidia-smi", ["--query-gpu=power.max_limit", "--format=csv,noheader,nounits", "-i", "0"], { windowsHide: true })
+  wattsCache ??= run("nvidia-smi", ["--query-gpu=power.max_limit", "--format=csv,noheader,nounits", "-i", "0"], { windowsHide: true, timeout: 5000 })
     .then(({ stdout }) => Number.parseFloat(stdout) || null, () => null);
   return wattsCache;
 }
