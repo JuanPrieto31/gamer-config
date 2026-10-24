@@ -13,7 +13,9 @@ const opts = { windowsHide: true };
 
 /* ---------- Ajustes ---------- */
 
-const DEFAULTS = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false };
+// measure: medir los FPS de cada partida sin mostrar las estadísticas (para calibrar); autoTune: ajustar solo tras la partida.
+// Las dos van aparte de "enabled": se puede medir sin cambiar el plan de energía ni cerrar programas.
+const DEFAULTS = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false, measure: false, autoTune: false };
 // Nunca se cierran procesos de Windows ni la propia app, aunque lleguen en la lista.
 const PROTECTED = /^(explorer|svchost|csrss|winlogon|wininit|services|lsass|smss|dwm|system|registry|fontdrvhost|sihost|ctfmon|taskhostw|runtimebroker|searchhost|startmenuexperiencehost|shellexperiencehost|textinputhost|securityhealthsystray|taskmgr|conhost|audiodg|gamer config|electron|steam|steamwebhelper|epicwebhelper|epicgameslauncher|riotclientservices|riotclientux|nvidia overlay|nvcontainer|nvidia share|amdrsserv|radeonsoftware)\.exe$/i;
 const file = () => path.join(app.getPath("userData"), "gamemode.json");
@@ -28,7 +30,8 @@ export function getSettings() {
 
 function sanitize(s) {
   const out = structuredClone(DEFAULTS);
-  for (const k of ["enabled", "power", "reopen", "overlay"]) if (typeof s?.[k] === "boolean") out[k] = s[k];
+  for (const k of ["enabled", "power", "reopen", "overlay", "measure", "autoTune"]) if (typeof s?.[k] === "boolean") out[k] = s[k];
+  if (!out.measure) out.autoTune = false; // "Ajustar solo" depende de medir: no se queda activado y escondido
   if (Array.isArray(s?.closeApps)) {
     out.closeApps = [...new Set(s.closeApps.filter((n) => typeof n === "string" && /^[\w .()&+-]{1,80}\.exe$/i.test(n) && !PROTECTED.test(n)).map((n) => n.toLowerCase()))].slice(0, 20);
   }
@@ -39,6 +42,13 @@ export function setSettings(patch) {
   settings = sanitize({ ...getSettings(), ...patch });
   writeFileSync(file(), JSON.stringify(settings));
   restartWatch();
+  // Cambios con una partida en curso: la medición sigue lo que diga el ajuste ya, y si se enciende el modo juego
+  // cuando solo se estaba midiendo, se suelta la partida para que el siguiente vistazo la active entera (plan, programas).
+  serial(async () => {
+    if (!active) return;
+    if (active.onlyMeasure && settings.enabled) { await deactivate(); return; } // se para la medición antes de soltarla
+    onMeasure(settings.measure);
+  });
   return settings;
 }
 
@@ -74,6 +84,7 @@ let timer = null;
 let active = null; // { game, exe, prevPlan, closed: [{ name, path }] }
 let notify = () => {};
 let onOverlay = () => {};
+let onMeasure = () => {};
 // Si la app se cierra de golpe (o se apaga el PC) a mitad de partida, al volver a abrirla se restaura lo que quedó cambiado.
 const stateFile = () => path.join(app.getPath("userData"), "gamemode-activo.json");
 
@@ -81,9 +92,10 @@ const stateFile = () => path.join(app.getPath("userData"), "gamemode-activo.json
 let chain = Promise.resolve();
 const serial = (fn) => (chain = chain.then(fn).catch(() => {}));
 
-export function init({ notify: n, overlay }) {
+export function init({ notify: n, overlay, measure }) {
   notify = n;
   onOverlay = overlay;
+  onMeasure = measure ?? onMeasure;
   try {
     active = JSON.parse(readFileSync(stateFile(), "utf8"));
     serial(() => deactivate(true));
@@ -93,8 +105,10 @@ export function init({ notify: n, overlay }) {
 
 function restartWatch() {
   clearInterval(timer);
-  timer = getSettings().enabled ? setInterval(tick, 5000) : null;
-  if (!getSettings().enabled) serial(() => deactivate());
+  const { enabled, measure } = getSettings();
+  timer = enabled || measure ? setInterval(tick, 5000) : null;
+  // Al apagar el modo juego se restaura todo al momento; si se sigue midiendo, el siguiente vistazo retoma la partida solo para medir.
+  if (!enabled && !(active?.onlyMeasure && measure)) serial(() => deactivate());
 }
 
 export const status = () => ({ active: active ? active.game : null });
@@ -137,6 +151,9 @@ async function activate(game, exe, procs) {
   const a = { game, exe, prevPlan: null, closed: [] };
   active = a;
   const done = [];
+  if (s.measure) onMeasure(true);
+  // Solo medir (modo juego apagado): no se toca nada más ni se avisa.
+  if (!s.enabled) { a.onlyMeasure = true; writeFileSync(stateFile(), JSON.stringify(a)); return; }
   if (s.power) {
     const r = await setPerformancePlan().catch(() => null);
     if (r && r.prev?.guid !== r.target.guid) { a.prevPlan = r.prev?.guid ?? null; done.push(`plan «${r.target.name}»`); }
@@ -158,6 +175,8 @@ async function deactivate(recovered = false) {
   const a = active;
   active = null;
   if (!a) return;
+  onMeasure(false); // fin de la partida: se calcula con lo medido
+  if (a.onlyMeasure) { rmSync(stateFile(), { force: true }); return; } // no se cambió nada: nada que restaurar ni avisar
   if (a.prevPlan) await setPlan(a.prevPlan).catch(() => {});
   if (getSettings().reopen) {
     for (const c of a.closed.filter((c) => c.path)) spawn(c.path, [], { detached: true, stdio: "ignore", windowsHide: false }).on("error", () => {}).unref();

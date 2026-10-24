@@ -266,18 +266,44 @@ async function open() {
   win.setAlwaysOnTop(true, "screen-saver");
   win.setIgnoreMouseEvents(true);
   // Se cierre como se cierre, se dejan de medir cosas.
-  win.on("closed", () => { stopSampling(); win = null; });
+  const w = win;
+  // Si se cierra por otra vía (no desde hide()), se deja de medir. hide() ya lo hace y quita la ventana antes:
+  // así este aviso, que puede llegar tarde, no corta la medición en segundo plano que se reanuda después.
+  win.on("closed", () => { if (win === w) { stopSampling(); win = null; if (measuring) startMeasure(); } });
   await win.loadFile(path.join(dir, "overlay.html"));
   place();
   win.showInactive();
+  stopSampling(); // si se estaba midiendo en silencio, sigue la medición completa de la ventana
   startSampling();
 }
 
 export function hide() {
   if (opening) return void opening.then(hide);
   stopSampling();
-  if (win && !win.isDestroyed()) win.destroy();
+  const w = win;
   win = null;
+  if (w && !w.isDestroyed()) w.destroy();
+  if (measuring) startMeasure();
+}
+
+/* ---------- Medición sin ventana (opción "Medir FPS de cada partida" del modo juego) ---------- */
+// Solo FPS (PresentMon), sin pintar nada, para calibrar al acabar la partida. Apagada por defecto:
+// sin esa opción, con el overlay oculto no se mide nada.
+let measuring = false;
+
+function startMeasure() {
+  if (timer || !fpsReady) return;
+  session++;
+  startFps();
+  timer = setInterval(tickFps, 1000);
+}
+
+export async function measure(on) {
+  measuring = on;
+  if (on) {
+    await checkFps();
+    if (measuring && !win) startMeasure();
+  } else if (!win) stopSampling(); // stopSampling avisa con la mediana de la partida (setSessionHandler)
 }
 
 export function toggle() {

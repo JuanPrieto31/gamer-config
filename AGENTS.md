@@ -50,8 +50,8 @@ Con `--pruebas`, la app usa otra carpeta de datos (`%APPDATA%\Gamer Config (prue
 | `electron/autodetect.js` | Busca archivos de configuración de juegos sin perfil |
 | `electron/windows.js` | Optimizaciones de Windows con historial y deshacer |
 | `electron/online.js` | Consultas en línea con caché (Windows Update, NVIDIA) |
-| `electron/overlay.js` + `overlay.html` | Estadísticas en el juego (ventana transparente que no captura clics) |
-| `electron/gamemode.js` | Modo juego automático (plan de energía, cerrar/reabrir apps, recuperación tras cierre inesperado) |
+| `electron/overlay.js` + `overlay.html` | Estadísticas en el juego (ventana transparente que no captura clics) y medición de FPS sin ventana (`measure`, solo si el usuario la activa) |
+| `electron/gamemode.js` | Modo juego automático (plan de energía, cerrar/reabrir apps, recuperación tras cierre inesperado). También vigila las partidas para medir FPS (`measure`) y ajustar solo después (`autoTune` → `optimize.autoTune`) |
 | `electron/network.js` | Prueba de conexión |
 | `electron/cleanup.js` | Limpieza de lo que dejan las actualizaciones de los juegos: solo borra lo de su lista, nunca partidas, ajustes ni mods |
 | `electron/covers.js` | Portadas de juegos sin imagen (Epic, Riot, Xbox, búsqueda en Steam, icono del exe) |
@@ -112,7 +112,7 @@ Al añadir o cambiar un perfil:
 - **Drivers comprobados contra la nube.** No se muestra "al día" sin haberlo comprobado en línea. Si no hay conexión, se dice.
 - **Nada de inyección en juegos.**
   - El overlay es una ventana aparte y PresentMon lee eventos ETW, así que es seguro con los antitrampas. No añadas hooks, DLLs ni lectura de memoria de procesos.
-  - El overlay oculto no debe consumir nada: el muestreo se detiene.
+  - El overlay oculto no debe consumir nada: el muestreo se detiene. Única excepción: «Medir los FPS de cada partida» (apagado por defecto), que solo cuenta fotogramas con PresentMon mientras hay un juego abierto.
 - **No matar procesos del sistema.** Respeta la lista `PROTECTED` de `gamemode.js`.
 - **Privacidad.**
   - No se envían datos personales ni identificadores a ningún servicio.

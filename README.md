@@ -6,7 +6,8 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 
 - **Detecta tus juegos** de Steam, Epic, Riot, Xbox, EA, Ubisoft, Battle.net, GOG, Rockstar y Roblox, también los que instales después, con su portada (o su logo si no están en ninguna tienda).
 - **Calcula la configuración de vídeo** con todo tu hardware: gráfica (y su versión de memoria y potencia en portátiles), VRAM, procesador, hilos, cantidad, canales y velocidad de la RAM, disco, batería, plan de energía, resolución y Hz de la pantalla principal. Usa los requisitos de Steam de cada juego y el coste de cada ajuste.
-- **Aprende de tus FPS reales**: cuando mides una partida con las estadísticas en el juego, corrige el cálculo de ese juego en tu PC.
+- **Aprende de tus FPS reales**: cuando mides una partida con las estadísticas en el juego, corrige el cálculo de ese juego en tu PC. Si lo activas, mide cada partida sin mostrar nada y, si no llegas a tu objetivo, te avisa o ajusta el juego solo (con copia y deshacer).
+- **Comparte tus ajustes**: exporta la configuración de un juego a un archivo `.gcprofile` e importa la de otra persona. Solo lleva ajustes de vídeo, nada tuyo, y antes de aplicarla ves qué cambia.
 - **Perfiles propios** para LoL, Apex, Deadlock, Warframe, Dying Light, RE6, Fortnite, Counter-Strike 2, GTA V, Minecraft y Marvel Rivals; los juegos de Unreal Engine y el resto se configuran por detección automática.
 - **Tecnologías de imagen para todos los juegos**: escalado (DLSS, FSR o XeSS) y su calidad, generación de fotogramas (2x, 3x, 4x) y baja latencia (Reflex). Solo se ofrece lo que admite tu gráfica: NVIDIA, AMD o Intel. En automático se usa lo mejor que tengas y el escalado es lo primero que se activa antes de bajar calidad, como en los ajustes óptimos de NVIDIA.
 - **Referencia de NVIDIA**: si tienes la app de NVIDIA, se muestra lo que recomienda para tu PC en cada juego, junto al cálculo.

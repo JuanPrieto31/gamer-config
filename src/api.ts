@@ -50,6 +50,7 @@ export interface GameDetail {
   reached: boolean;
   loweredNothing: boolean; // con todo al máximo ya se llega al objetivo
   measuredFps?: number | null; // FPS medidos en la última partida (estadísticas en el juego); los estimados no se enseñan
+  measuredRecent?: number[]; // últimas partidas medidas (hasta 5), de la más antigua a la más reciente
   canApply: boolean;
   configFound: boolean;
   hasBackup: boolean;
@@ -87,7 +88,9 @@ export interface OverlaySettings {
 }
 export interface OverlayState { settings: OverlaySettings; visible: boolean; fpsReady: boolean; hotkeyOk: boolean }
 
-export interface GameModeSettings { enabled: boolean; power: boolean; closeApps: string[]; reopen: boolean; overlay: boolean }
+export interface GameModeSettings { enabled: boolean; power: boolean; closeApps: string[]; reopen: boolean; overlay: boolean; measure: boolean; autoTune: boolean }
+// Perfil compartido (.gcprofile) leído y validado, antes de aplicarlo.
+export interface SharedImport { changes: { key: string; label: string | null; current: string | null; value: string }[]; rejected: number; from: { gpu: string; date: string } }
 export interface GameModeState { settings: GameModeSettings; active: string | null }
 // Tecnologías de imagen (configuración global para todos los juegos)
 export interface TechSettings { upscaler: "auto" | "dlss" | "fsr" | "xess" | "off"; quality: "auto" | "calidad" | "equilibrado" | "rendimiento" | "nativo"; dlssModel: "auto" | "transformer" | "cnn"; frameGen: "auto" | "off" | "2x" | "3x" | "4x"; latency: "auto" | "off" | "on" | "boost" }
@@ -145,6 +148,9 @@ interface Bridge {
   restoreGame(id: string): Promise<string>;
   copyReport(id: string, goal: Goal): Promise<boolean>;
   logError(msg: string): Promise<void>;
+  profileExport(id: string): Promise<string | null>;
+  profileImport(id: string): Promise<SharedImport | null>;
+  profileImportApply(id: string): Promise<string>;
   errorReport(): Promise<number>;
   applyAll(goal: Goal): Promise<ApplyResult[]>;
   setValues(id: string, file: string, changes: { key: string; value: string }[]): Promise<string>;
@@ -177,7 +183,7 @@ const mockOverlay: OverlaySettings = {
   position: "tl", size: "m", opacity: 0.55, hotkey: "Alt+Shift+O", background: true,
 };
 
-const mockGameMode: GameModeSettings = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false };
+const mockGameMode: GameModeSettings = { enabled: false, power: true, closeApps: [], reopen: true, overlay: false, measure: false, autoTune: false };
 const mockTech: TechSettings = { upscaler: "auto", quality: "auto", dlssModel: "auto", frameGen: "auto", latency: "auto" };
 
 // Datos de ejemplo para el navegador.
@@ -240,6 +246,12 @@ const mock: Bridge = {
   async restoreGame() { await wait(500); return "Configuración original restaurada (ejemplo)."; },
   async copyReport() { return true; },
   async logError(msg) { console.error(msg); },
+  async profileExport() { await wait(300); return "Fortnite - Gamer Config.gcprofile"; },
+  async profileImport() {
+    await wait(300);
+    return { changes: [{ key: "sg.ShadowQuality", label: "Sombras", current: "3", value: "1" }, { key: "sg.ViewDistanceQuality", label: "Distancia de visión", current: "3", value: "2" }], rejected: 0, from: { gpu: "NVIDIA GeForce RTX 4060", date: "2026-10-20" } };
+  },
+  async profileImportApply() { await wait(500); return "2 ajustes importados (ejemplo)."; },
   async errorReport() { return 0; },
   async setValues() { await wait(500); return "Ajustes guardados (ejemplo)."; },
   async applyAll() {

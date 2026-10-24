@@ -129,7 +129,7 @@ function overlayView() {
     <header class="head">
       <div>
         <h1>En juego</h1>
-        <p class="sub">Pulsa <kbd>${esc(s.hotkey)}</kbd> dentro del juego para mostrar u ocultar las estadísticas. Solo miden mientras se ven: ocultas no gastan nada.</p>
+        <p class="sub">Pulsa <kbd>${esc(s.hotkey)}</kbd> dentro del juego para mostrar u ocultar las estadísticas. Solo miden mientras se ven: ocultas no gastan nada${state.gamemode?.settings.measure ? " (salvo los FPS de cada partida, que has activado abajo)" : ""}.</p>
       </div>
       <button class="btn ${o.visible ? "" : "primary"}" data-act="overlay-toggle">${o.visible ? "Ocultar estadísticas" : "Mostrar estadísticas"}</button>
     </header>
@@ -202,6 +202,13 @@ function gameModeBlock() {
         </div>
         <label class="ov-check"><input type="checkbox" data-gm="reopen" ${s.reopen ? "checked" : ""} /> Volver a abrirlos al cerrar el juego</label>
       </div>` : ""}
+      <div class="gm-opts">
+        <h3>Tus FPS reales</h3>
+        <label class="ov-check"><input type="checkbox" data-gm="measure" ${s.measure ? "checked" : ""} /> Medir los FPS de cada partida, sin mostrar las estadísticas, para afinar el cálculo de cada juego</label>
+        ${s.measure ? `<label class="ov-check"><input type="checkbox" data-gm="autoTune" ${s.autoTune ? "checked" : ""} /> Ajustar el juego solo al acabar la partida si no llega a su objetivo (con copia y se puede deshacer)</label>` : ""}
+        ${s.measure && state.overlay && !state.overlay.fpsReady ? `<p class="muted small">Para medir hace falta el permiso de FPS de arriba («Activar FPS»).</p>` : ""}
+        ${s.measure && !s.autoTune ? `<p class="muted small">Si una partida va por debajo del objetivo, te avisará junto al reloj para que apliques el ajuste.</p>` : ""}
+      </div>
     </section>`;
 }
 
@@ -646,7 +653,7 @@ function recPanel(g: Game, d: GameDetail, editable: boolean) {
       <div>
         <span class="muted">Ajustes que cambian</span>
         <strong>${lowered} de ${d.settings.length}</strong>
-        <span class="muted">${d.measuredFps ? `Medidos en tu última partida: ${d.measuredFps} FPS` : "Para ver tus FPS reales, usa las estadísticas en el juego"}</span>
+        <span class="muted">${d.measuredFps ? `Medidos en tu última partida: ${d.measuredFps} FPS${(d.measuredRecent?.length ?? 0) > 1 ? ` · últimas partidas: ${d.measuredRecent!.join(" → ")}` : ""}` : "Para ver tus FPS reales, usa las estadísticas en el juego o activa «Medir los FPS de cada partida» en En juego"}</span>
         <button class="link" data-tab="game:calc">Ver todo lo que se ha tenido en cuenta</button>
       </div>
     </div>
@@ -666,7 +673,11 @@ function recPanel(g: Game, d: GameDetail, editable: boolean) {
       <div class="apply-info rec-foot">
         <p class="muted">${icon.restore} Se guarda una copia antes de cambiar nada.</p>
         ${d.hasBackup ? `<button class="link" data-act="restore-game">Restaurar configuración original</button>` : ""}
-      </div>` : ""}`;
+      </div>
+      ${d.kind === "perfil" ? `<div class="apply-info rec-foot">
+        <p class="muted">Comparte tus ajustes de ${esc(g.name)} con un archivo, o usa los de otra persona.</p>
+        <span><button class="link" data-act="profile-export">Exportar ajustes</button> · <button class="link" data-act="profile-import">Importar ajustes</button></span>
+      </div>` : ""}` : ""}`;
 }
 
 // Pestaña "Cómo se calcula": todos los factores, la nota del perfil, las fuentes y el informe.
@@ -1193,6 +1204,23 @@ async function applyGame() {
   if (ok) { await refreshGames(); loadDetail(); }
 }
 
+// Perfil compartido: se elige el archivo, se ve qué cambiaría y se confirma como cualquier otro cambio.
+async function importProfile() {
+  const g = state.game;
+  if (!g || state.working) return;
+  let imp;
+  try { imp = await api.profileImport(g.id); } catch (e) { return toast(errorText(e), true); }
+  if (!imp) return;
+  if (imp.changes.length === 0) return toast(`Ya tienes esos mismos ajustes en ${g.name}.`);
+  const list = imp.changes.slice(0, 8).map((c) => `${c.label ?? c.key}: ${c.current ?? "—"} → ${c.value}`).join(" · ");
+  const extra = imp.changes.length > 8 ? ` y ${imp.changes.length - 8} más` : "";
+  const skipped = imp.rejected ? ` Se ignoran ${imp.rejected} valores que el perfil de ${g.name} no reconoce.` : "";
+  const ok = await change("game", `Importar ajustes en ${g.name}`,
+    `Perfil de un PC con ${imp.from.gpu || "gráfica desconocida"}${imp.from.date ? ` (${imp.from.date})` : ""}: ${list}${extra}.${skipped} Cierra el juego antes de continuar.`, "Importar",
+    () => api.profileImportApply(g.id), { undoable: true });
+  if (ok) { await refreshGames(); loadDetail(); }
+}
+
 async function restoreGame() {
   const g = state.game;
   if (!g) return;
@@ -1259,6 +1287,13 @@ document.addEventListener("click", (e) => {
     );
   }
   else if (d.act === "retry-detail") loadDetail();
+  else if (d.act === "profile-export" && state.game) {
+    api.profileExport(state.game.id).then(
+      (name) => { if (name) toast(`Guardado como «${name}». Pásaselo a quien quieras: no lleva datos tuyos.`); },
+      (e) => toast(errorText(e), true),
+    );
+  }
+  else if (d.act === "profile-import") importProfile();
   else if (d.act === "error-report") {
     api.errorReport().then(
       (n) => toast(n ? `Informe con ${n} ${n === 1 ? "error" : "errores"} copiado. Pégalo en un mensaje (Ctrl+V).` : "Informe copiado: no hay errores registrados."),

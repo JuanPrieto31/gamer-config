@@ -1,7 +1,8 @@
 import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
 import { fileURLToPath } from "node:url";
-import { watch, statfsSync, existsSync, cpSync, appendFileSync, statSync, renameSync, readFileSync, rmSync } from "node:fs";
+import { watch, statfsSync, existsSync, cpSync, appendFileSync, statSync, renameSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
+import fs from "node:fs/promises";
 import path from "node:path";
 import * as system from "./system.js";
 import * as win from "./windows.js";
@@ -165,6 +166,8 @@ async function watchGames() {
 
 /* ---------- IPC ---------- */
 
+const pendingImport = new Map(); // id del juego → perfil compartido leído, a la espera de que el usuario confirme
+
 const handlers = {
   specs: () => system.specs(),
   usage: () => system.usage(),
@@ -248,6 +251,43 @@ const handlers = {
     ];
     clipboard.writeText(lines.join("\n"));
     return true;
+  },
+  // Perfiles compartidos (.gcprofile). La interfaz nunca manda valores: el archivo se lee aquí y se guarda
+  // hasta que el usuario confirma; al aplicar se vuelve a validar contra el perfil del juego.
+  "profile-export": async (id) => {
+    const g = gameById(id);
+    const data = await optimize.exportShared(g);
+    const r = await dialog.showSaveDialog(mainWindow, {
+      title: `Exportar los ajustes de ${g.name}`,
+      defaultPath: path.join(app.getPath("documents"), `${g.name.replace(/[^\w .-]/g, "")} - Gamer Config.gcprofile`),
+      filters: [{ name: "Perfil de Gamer Config", extensions: ["gcprofile"] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    await fs.writeFile(r.filePath, JSON.stringify(data, null, 1));
+    return path.basename(r.filePath);
+  },
+  "profile-import": async (id) => {
+    const g = gameById(id);
+    const r = await dialog.showOpenDialog(mainWindow, {
+      title: `Importar ajustes para ${g.name}`, properties: ["openFile"],
+      filters: [{ name: "Perfil de Gamer Config", extensions: ["gcprofile"] }],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    if ((await fs.stat(r.filePaths[0])).size > 256 * 1024) throw new Error("Ese archivo es demasiado grande para ser un perfil de Gamer Config.");
+    let data;
+    try { data = JSON.parse(await fs.readFile(r.filePaths[0], "utf8")); } catch { throw new Error("Ese archivo no es un perfil de Gamer Config."); }
+    const { changes, rejected, from } = await optimize.previewShared(g, data);
+    pendingImport.set(id, data);
+    // Para la vista previa: nombres legibles ("Épicas → Medias"), sin los datos internos del cálculo.
+    return { changes: changes.map(({ label, key, currentName, valueName }) => ({ label, key, current: currentName, value: valueName })), rejected, from };
+  },
+  "profile-import-apply": async (id) => {
+    const data = pendingImport.get(id);
+    pendingImport.delete(id);
+    if (!data) throw new Error("Vuelve a elegir el archivo del perfil.");
+    const msg = await optimize.applyShared(gameById(id), data);
+    await listGames();
+    return msg;
   },
   // Errores de la interfaz (recortados: no se confía en el tamaño de lo que llega).
   "log-error": (msg) => logError("interfaz", String(msg).slice(0, 2000)),
@@ -349,15 +389,34 @@ let updateReady = null;
 function checkUpdates() {
   if (!app.isPackaged) return; // en desarrollo no hay nada que actualizar
   // Se descarga sola en segundo plano y se instala al salir de la app (o al pulsar «Reiniciar y actualizar»).
+  // Como la app vive junto al reloj y casi nunca se cierra, si al abrirla ya había una versión descargada
+  // se instala en ese momento (el usuario está delante para el permiso de Windows) y se vuelve a abrir sola.
+  const startedAt = Date.now();
+  let downloading = false; // descarga nueva en esta sesión: esa no se instala de golpe al arrancar
+  let announced = "";      // la descarga ya hecha se vuelve a anunciar en cada comprobación: el aviso, una vez
+  autoUpdater.on("download-progress", () => { downloading = true; });
   autoUpdater.on("update-downloaded", (info) => {
     updateReady = info.version;
-    tray?.displayBalloon({ title: `Gamer Config ${info.version} lista`, content: "Se instalará al cerrar la app. También puedes instalarla ya desde el icono junto al reloj." });
+    // Una sola vez por versión: si se canceló el permiso de Windows o falló, no se insiste en cada arranque.
+    const tried = path.join(app.getPath("userData"), "actualizacion-intentada.txt");
+    let last = "";
+    try { last = readFileSync(tried, "utf8"); } catch { /* nunca se intentó */ }
+    if (Date.now() - startedAt < 30000 && !downloading && !gamemode.status().active && last !== info.version) {
+      try { writeFileSync(tried, info.version); } catch { /* sin marca se reintentaría una vez más: no pasa nada */ }
+      quitting = true;
+      autoUpdater.quitAndInstall(true, true);
+      return;
+    }
+    if (announced !== info.version) {
+      announced = info.version;
+      tray?.displayBalloon({ title: `Gamer Config ${info.version} lista`, content: "Se instalará al cerrar la app o la próxima vez que la abras. También puedes instalarla ya desde el icono junto al reloj." });
+    }
     mainWindow?.webContents.send("update-ready", info.version);
   });
-  autoUpdater.on("error", () => {}); // sin internet o sin versión nueva: se reintenta más tarde
-  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  autoUpdater.on("error", (e) => logError("actualizacion", e)); // sin internet: se reintenta en la próxima comprobación
+  const check = () => autoUpdater.checkForUpdates().catch((e) => logError("actualizacion", e));
   check();
-  setInterval(check, 6 * 3600 * 1000);
+  setInterval(check, 3600 * 1000); // cada hora: es una consulta pequeña
 }
 
 /* ---------- Segundo plano ---------- */
@@ -388,12 +447,25 @@ app.whenReady().then(() => {
   gamemode.init({
     notify: (title, content) => tray?.displayBalloon({ title, content }),
     overlay: (on) => (on ? overlay.show() : overlay.hide()),
+    measure: (on) => overlay.measure(on).catch((e) => logError("medir", e)),
   });
-  // Partida medida por el overlay → se calibra el cálculo de ese juego con sus FPS reales.
+  // Partida medida (overlay visible o medición en segundo plano) → se calibra el cálculo de ese juego con sus FPS reales,
+  // y si se queda corto del objetivo se propone el ajuste o, con "Ajustar solo", se aplica (con copia y deshacer).
   overlay.setSessionHandler(async (exe, fps) => {
     const name = gamemode.index.get(String(exe).toLowerCase())?.name;
     const game = name && knownGames.find((g) => g.name === name);
-    if (game) await optimize.calibrate(game, fps).catch(() => {});
+    if (!game || !(await optimize.calibrate(game, fps).catch(() => null))) return;
+    const auto = gamemode.getSettings().autoTune;
+    let r = await optimize.autoTune(game, auto).catch((e) => { logError("ajuste automático", e); return null; });
+    // Si no se pudo aplicar (p. ej. el juego aún se estaba cerrando), se queda en propuesta.
+    if (!r && auto) r = await optimize.autoTune(game, false).catch(() => null);
+    if (!r) return;
+    if (r.applied) {
+      await listGames().catch(() => {});
+      tray?.displayBalloon({ title: `${game.name}: ajustado con tus FPS reales`, content: `Ibas a ${r.measured} FPS (objetivo ${r.target}). ${r.applied} Puedes deshacerlo en el historial.` });
+    } else {
+      tray?.displayBalloon({ title: `${game.name}: ibas a ${r.measured} FPS`, content: `El objetivo es ${r.target}. Abre Gamer Config para aplicar ${r.changes} ${r.changes === 1 ? "cambio" : "cambios"} calculados con tus FPS reales.` });
+    }
   });
   checkUpdates();
   optimize.updateProfiles().catch(() => {});
@@ -418,4 +490,4 @@ app.on("before-quit", (e) => {
   e.preventDefault();
   gamemode.shutdown().finally(() => { restored = true; app.quit(); });
 });
-app.on("will-quit", () => overlay.hide());
+app.on("will-quit", () => { overlay.measure(false).catch(() => {}); overlay.hide(); }); // al salir no se sigue midiendo

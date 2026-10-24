@@ -239,8 +239,23 @@ async function checkProfiles() {
         if (r.kind !== "perfil") errs.push(`[${goal}] no usa su perfil (${r.kind})`);
         if (r.failed.length) errs.push(`[${goal}] no se releen: ${r.failed.join(", ")}`);
         if (r.linesAfter !== r.linesBefore) errs.push(`[${goal}] cambia el número de líneas (${r.linesBefore} → ${r.linesAfter})`);
-        if (goal === "equilibrado" && r.missing.length) console.log(`   ${p.id}: claves que no están en el archivo de ejemplo: ${r.missing.join(", ")}`);
+        if (goal === "equilibrado" && r.missing?.length) console.log(`   ${p.id}: claves que no están en el archivo de ejemplo: ${r.missing.join(", ")}`);
       }
+    }
+    // Perfil compartido: exportar y volver a importar no cambia nada; claves y valores desconocidos se ignoran.
+    if (sample && errs.length === 0) {
+      const text = await fs.readFile(path.join(fixtures, sample), "utf8");
+      const game = { id: p.games?.[0] ?? `prueba-${p.id}`, name: p.names?.[0] ?? p.name, store: "Prueba", path: null };
+      const shared = await optimize.exportShared(game, text);
+      const same = await optimize.previewShared(game, shared, text);
+      const [k] = Object.keys(shared.valores);
+      const evil = { ...shared, valores: { ...shared.valores, [k]: "9999", "Ruta.Rara": "C:\\malo" } };
+      const bad = await optimize.previewShared(game, evil, text);
+      const other = await optimize.previewShared(game, { ...shared, perfil: "otro" }, text).then(() => true, () => false);
+      if (!Object.keys(shared.valores).length) errs.push("compartir: no exporta ningún valor");
+      if (same.changes.length || same.rejected) errs.push(`compartir: reimportar cambia ${same.changes.length} y rechaza ${same.rejected}`);
+      if (bad.rejected !== 2 || bad.changes.length) errs.push(`compartir: debería rechazar 2 valores y no cambiar nada (${bad.rejected}, ${bad.changes.length})`);
+      if (other) errs.push("compartir: acepta un perfil de otro juego");
     }
     if (errs.length) ok = false;
     console.log(`${errs.length ? "X " : "ok"} perfil ${p.id}${sample ? ` (probado con ${sample})` : " (sin archivo de ejemplo)"}${errs.length ? ": " + errs.join(" · ") : ""}`);
