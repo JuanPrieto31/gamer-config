@@ -5,6 +5,8 @@ import { friendlyName, describe, isVideoSetting } from "./names";
 import { api, errorText } from "./api";
 import type { TechSettings, TechState, GameModeSettings, GameModeState, NetResult, OpenApp, ActionResult, ApplyResult, DriverInfo, DriverItem, OverlayMetric, OverlaySettings, OverlayState, GameFile, Finding, Game, GameDetail, Goal, HistoryEntry, Part, Specs, StartupApp, Usage, WinItem, WinState } from "./api";
 
+declare const __APP_VERSION__: string; // la pone Vite desde package.json (vite.config.ts)
+
 type View = "panel" | "sistema" | "juegos" | "juego";
 type WinTab = "opts" | "drivers" | "startup" | "net";
 
@@ -65,6 +67,7 @@ $("#app").innerHTML = `
     <nav>
       ${NAV.map(([v, label, ic]) => `<button class="nav" data-nav="${v}">${ic}<span>${label}</span></button>`).join("")}
     </nav>
+    <p class="version">Versión ${__APP_VERSION__}</p>
   </aside>
   <main id="view" tabindex="-1"></main>
 `;
