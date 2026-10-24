@@ -345,7 +345,7 @@ export async function setValues(game, file, changes) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Cada formato sabe leer un valor y escribirlo devolviendo el texto nuevo (null = no se pudo).
-const FORMATS = {
+export const FORMATS = {
   // [Seccion] Clave=Valor  (clave en el perfil: "Seccion.Clave")
   ini: {
     find(text, key) {
@@ -631,9 +631,10 @@ export async function restoreOriginal(game) {
 export async function dryRun(game, goal, testText) {
   const p = await plan(game, goal, { text: testText });
   const base = { kind: p.kind, estMax: p.result.estMax, estFinal: p.result.estFinal, target: p.result.target, demand: p.demand, bottleneck: p.result.bottleneck, factors: p.result.factors };
-  if (p.kind === "guia" || p.text == null) return { ...base, changed: 0, failed: [], linesBefore: 0, linesAfter: 0, noFile: true };
+  if (p.kind === "guia" || p.text == null) return { ...base, changed: 0, failed: [], missing: [], linesBefore: 0, linesAfter: 0, noFile: true };
   const { text, changed } = rewrite(p);
   const reread = (k) => p.fmt.read(text, k);
   const failed = p.settings.filter((x) => x.current != null && !isAt(x.s, x.rec, reread)).map((x) => x.s.key);
-  return { ...base, changed, failed, linesBefore: p.text.split(/\r?\n/).length, linesAfter: text.split(/\r?\n/).length, textAfter: text };
+  const missing = p.settings.filter((x) => x.current == null).map((x) => x.s.key); // claves del perfil que no están en el archivo
+  return { ...base, changed, failed, missing, linesBefore: p.text.split(/\r?\n/).length, linesAfter: text.split(/\r?\n/).length, textAfter: text };
 }

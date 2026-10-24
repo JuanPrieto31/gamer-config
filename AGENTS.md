@@ -26,7 +26,7 @@ Va dirigida a jugadores sin conocimientos técnicos. Todo lo que ve el usuario e
 ```bash
 npm install
 npm run app          # tsc + vite build y abre la app
-npm test             # autotest SOLO LECTURA: cálculo + simulación en tus juegos instalados; debe terminar en "TODO OK"
+npm test             # autotest SOLO LECTURA: cálculo, perfiles con sus archivos de ejemplo y simulación en tus juegos instalados; debe terminar en "TODO OK"
 npm run build        # comprobar tipos y compilar la interfaz
 npm run instalador   # instalador NSIS en release/
 node electron/configparse.js   # prueba de ida y vuelta de los formatos de configuración
@@ -62,6 +62,10 @@ Con `--pruebas`, la app usa otra carpeta de datos (`%APPDATA%\Gamer Config (prue
 | `src/fonts/` | New Rocker (OFL, con su licencia): títulos, menú, botones y rótulos. El texto de lectura va en Segoe UI |
 | `src/logo.svg` + `build/make-icon.js` | Logo GG (New Rocker convertido a trazos). `npx electron build/make-icon.js` genera `build/icon.png`, `build/icon.ico` y `public/favicon.svg`. Dentro de la app no se muestra: solo en los iconos |
 | `profiles/` | Perfiles por juego + `engines/` (Unreal y genérico) + `index.json` |
+| `test/fixtures/` | Un archivo de configuración real por perfil (`<id>.<ext>`), **sin datos personales**: cuentas, correos y partidas recientes se quitan antes de subirlo |
+| `.github/workflows/ci.yml` | CI en cada push y PR (Windows): `npm run build`, `node electron/configparse.js` y `npm test` |
+
+Errores: la app guarda los suyos en `%APPDATA%\Gamer Config\errores.log` (rotado a 500 KB, con la carpeta del usuario anonimizada). Nunca se envía: el usuario lo copia desde Resumen («Copiar informe de errores») si quiere pedir ayuda.
 
 ## Perfiles de juegos (`profiles/`)
 
@@ -93,7 +97,7 @@ Al añadir o cambiar un perfil:
   - Los valores de cada juego se comprueban con su archivo real antes de subir.
 - **Fuentes:** costes basados en fuentes reales (guías de NVIDIA, del desarrollador…), citadas en `sources`.
 - **Etiquetas:** en español, neutras y comprensibles.
-- **Comprobación:** `npm test` simula los tres modos en los juegos instalados en tu PC. Solo prueba el perfil si tienes el juego. Si no lo tienes, pruébalo con un archivo de configuración de ejemplo, comprobando que se lee y que la escritura no cambia el número de líneas.
+- **Comprobación:** `npm test` (y la CI) valida todos los perfiles contra `index.json` y simula los tres modos sobre su archivo de `test/fixtures/`: que se lean y escriban todas las claves sin cambiar el número de líneas. También avisa de las claves del perfil que no están en el archivo real. Al añadir un perfil, añade su archivo de ejemplo. Además simula en los juegos instalados en tu PC.
 
 ## Reglas que no se rompen
 

@@ -144,6 +144,8 @@ interface Bridge {
   applyGame(id: string, goal: Goal): Promise<string>;
   restoreGame(id: string): Promise<string>;
   copyReport(id: string, goal: Goal): Promise<boolean>;
+  logError(msg: string): Promise<void>;
+  errorReport(): Promise<number>;
   applyAll(goal: Goal): Promise<ApplyResult[]>;
   setValues(id: string, file: string, changes: { key: string; value: string }[]): Promise<string>;
   winState(): Promise<WinState>;
@@ -237,6 +239,8 @@ const mock: Bridge = {
   async applyGame() { await wait(800); return "Ajustes aplicados (ejemplo)."; },
   async restoreGame() { await wait(500); return "Configuración original restaurada (ejemplo)."; },
   async copyReport() { return true; },
+  async logError(msg) { console.error(msg); },
+  async errorReport() { return 0; },
   async setValues() { await wait(500); return "Ajustes guardados (ejemplo)."; },
   async applyAll() {
     await wait(1500);
