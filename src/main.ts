@@ -46,7 +46,8 @@ const state = {
 };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+// Un texto que falta (p. ej. un ajuste del perfil sin "why") se pinta vacío: no debe romper toda la pantalla.
+const esc = (s: string | null | undefined) => (s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /* ---------- Permiso para hacer cambios ---------- */
 

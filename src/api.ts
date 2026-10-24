@@ -54,7 +54,7 @@ export interface GameDetail {
   canApply: boolean;
   configFound: boolean;
   hasBackup: boolean;
-  settings: { name: string; key: string | null; why: string; change: boolean; current: string | null; recommended: string }[];
+  settings: { name: string; key: string | null; why?: string; change: boolean; current: string | null; recommended: string }[];
 }
 
 export interface DriverItem {
