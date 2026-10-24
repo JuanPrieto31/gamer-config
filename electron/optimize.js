@@ -514,7 +514,11 @@ export async function calibrate(game, measuredFps) {
   const all = await readCalibration();
   const prev = all[game.id];
   const factor = prev ? prev.factor * 0.6 + ratio * 0.4 : ratio;
-  all[game.id] = { factor: Math.round(factor * 100) / 100, sessions: (prev?.sessions ?? 0) + 1, lastMeasured: Math.round(measuredFps), lastEstimated: est, at: new Date().toISOString() };
+  all[game.id] = {
+    factor: Math.round(factor * 100) / 100, sessions: (prev?.sessions ?? 0) + 1, lastMeasured: Math.round(measuredFps), lastEstimated: est,
+    recent: [...(prev?.recent ?? []), Math.round(measuredFps)].slice(-5), // últimas partidas, para ver la tendencia
+    at: new Date().toISOString(),
+  };
   await fs.mkdir(userDir(), { recursive: true });
   await fs.writeFile(calFile(), JSON.stringify(all, null, 1));
   return all[game.id];
@@ -522,6 +526,22 @@ export async function calibrate(game, measuredFps) {
 
 const appliedFile = () => userDir("applied.json");
 const readApplied = async () => JSON.parse(await fs.readFile(appliedFile(), "utf8").catch(() => "{}"));
+
+/**
+ * Tras una partida medida y calibrada: si el juego está optimizado con Gamer Config y los FPS reales se quedan
+ * más de un 10 % por debajo del objetivo, se recalcula con lo medido. auto: aplica ya (copia, historial y deshacer,
+ * y nunca con el juego abierto: apply() lo comprueba); si no, solo devuelve la propuesta para avisar.
+ */
+export async function autoTune(game, auto) {
+  const goal = (await readApplied())[game.id];
+  const measured = (await readCalibration())[game.id]?.lastMeasured;
+  if (!goal || !measured) return null;
+  const p = await plan(game, goal);
+  const changes = p.settings.filter((x) => x.change).length;
+  if (p.kind === "guia" || p.text == null || changes === 0 || measured >= p.result.target * 0.9) return null;
+  const info = { goal, measured, target: p.result.target, changes };
+  return auto ? { ...info, applied: await apply(game, goal) } : info;
+}
 
 // Para la lista de juegos (rápido: sin consultar requisitos).
 export async function status(game) {
@@ -551,6 +571,7 @@ export async function detail(game, goal) {
     estCurrent: p.result.estCurrent,
     // FPS de verdad: la mediana de la última partida medida con las estadísticas en el juego (si la hay).
     measuredFps: (await readCalibration())[game.id]?.lastMeasured ?? null,
+    measuredRecent: (await readCalibration())[game.id]?.recent ?? [],
     target: p.result.target,
     reached: p.result.reached,
     loweredNothing: p.result.loweredNothing,
@@ -611,6 +632,93 @@ export async function apply(game, goal) {
   const goalName = { fps: "más FPS", equilibrado: "equilibrado", calidad: "calidad" }[goal];
   await record(`${game.name}: ${changed} ajustes (${goalName})`, { type: "file", path: p.file, backup });
   return `${changed} ajustes aplicados en ${game.name}.`;
+}
+
+/* ---------- Perfiles compartidos (.gcprofile) ---------- */
+// Los valores de vídeo de un juego en un archivo para pasárselo a otra persona. Solo lleva claves del perfil del juego
+// (nada de rutas, cuentas ni otras líneas del archivo) y al importar solo se aceptan valores que el perfil conoce.
+
+const SHARED = "gamer-config-perfil";
+
+// Claves que se pueden compartir y sus valores válidos: los niveles del perfil, sus equivalentes y las claves extra (also).
+function sharedKeys(profile) {
+  const allowed = new Map();
+  const add = (k, v) => { if (!allowed.has(k)) allowed.set(k, new Set()); allowed.get(k).add(String(v)); };
+  for (const s of profile.settings) {
+    for (const l of s.levels ?? []) {
+      add(s.key, l.value);
+      for (const m of [l.match ?? []].flat()) add(s.key, m);
+      for (const [k, v] of Object.entries(l.also ?? {})) add(k, v);
+    }
+  }
+  return allowed;
+}
+
+// text: contenido de prueba en lugar del archivo real (npm test), como en dryRun.
+async function sharedPlan(game, text) {
+  const p = await plan(game, "equilibrado", { text });
+  if (p.kind !== "perfil") throw new Error("Solo se pueden compartir los juegos con perfil propio de Gamer Config.");
+  if (p.text == null) throw new Error("No se encontró el archivo de configuración. Abre el juego una vez, ciérralo y vuelve a intentarlo.");
+  return p;
+}
+
+export async function exportShared(game, text) {
+  const p = await sharedPlan(game, text);
+  const values = {};
+  // Solo valores que el perfil conoce (un valor puesto a mano fuera de sus niveles no se podría importar).
+  for (const [k, ok] of sharedKeys(p.profile)) {
+    const v = p.fmt.read(p.text, k);
+    if (v != null && ok.has(v)) values[k] = v;
+  }
+  return { tipo: SHARED, version: 1, juego: game.name, perfil: p.profile.id, grafica: p.hw.gpu, fecha: new Date().toISOString().slice(0, 10), valores: values };
+}
+
+// Valida un archivo importado contra el perfil de este juego y dice qué cambiaría (sin escribir nada).
+export async function previewShared(game, data, text) {
+  const p = await sharedPlan(game, text);
+  if (data?.tipo !== SHARED || typeof data.valores !== "object" || data.valores === null) throw new Error("Ese archivo no es un perfil de Gamer Config.");
+  if (data.perfil !== p.profile.id) throw new Error(`Ese perfil es de ${String(data.juego ?? "otro juego").slice(0, 60)}, no de ${game.name}.`);
+  const allowed = sharedKeys(p.profile);
+  const labels = new Map(p.profile.settings.map((s) => [s.key, s.label]));
+  // Para enseñar "Épicas → Medias" en vez de "3 → 1" (las claves extra no tienen nombre: se enseña el valor).
+  const nameOf = (k, v) => p.profile.settings.find((s) => s.key === k)?.levels?.find((l) => String(l.value) === v)?.label ?? v;
+  const changes = [];
+  let rejected = 0;
+  for (const [k, v] of Object.entries(data.valores)) {
+    if (typeof v !== "string" || !allowed.get(k)?.has(v)) { rejected++; continue; } // clave o valor que el perfil no conoce: no se escribe
+    const current = p.fmt.read(p.text, k);
+    // Claves que este archivo no tiene no se añaden (como al aplicar un modo): el archivo conserva sus líneas.
+    if (current != null && current !== v) changes.push({ key: k, label: labels.get(k) ?? null, current, value: v, currentName: current == null ? null : nameOf(k, current), valueName: nameOf(k, v) });
+  }
+  return { p, changes, rejected, from: { gpu: String(data.grafica ?? "").slice(0, 80), date: String(data.fecha ?? "").slice(0, 10) } };
+}
+
+export async function applyShared(game, data) {
+  const { p, changes } = await previewShared(game, data);
+  if (changes.length === 0) return "Ya tenías esos mismos ajustes.";
+  const procs = await runningProcesses();
+  if (p.processes.some((x) => procs.has(x.toLowerCase()))) throw new Error(`Cierra ${game.name} antes de aplicar los cambios.`);
+  const nl = p.text.includes("\r\n") ? "\r\n" : "\n";
+  let text = p.text;
+  let changed = 0;
+  for (const c of changes) {
+    const next = p.fmt.write(text, c.key, c.value, nl);
+    if (next != null) { text = next; changed++; }
+  }
+  if (changed === 0) throw new Error("No se pudo escribir ningún ajuste en el archivo del juego.");
+  await fs.mkdir(userDir("backups"), { recursive: true });
+  const ext = path.extname(p.file);
+  const original = userDir("backups", `${safeId(game.id)}-original${ext}`);
+  if (!existsSync(original)) await fs.writeFile(original, p.text);
+  const backup = userDir("backups", `${safeId(game.id)}-${Date.now()}${ext}`);
+  await fs.writeFile(backup, p.text);
+  await writeAtomic(p.file, text);
+  // Ya no está en un modo de Gamer Config: así el ajuste automático tras las partidas no lo pisa.
+  const applied = await readApplied();
+  delete applied[game.id];
+  await fs.writeFile(appliedFile(), JSON.stringify(applied));
+  await record(`${game.name}: ${changed} ajustes importados de un perfil compartido`, { type: "file", path: p.file, backup });
+  return `${changed} ajustes importados en ${game.name}.`;
 }
 
 export async function restoreOriginal(game) {
