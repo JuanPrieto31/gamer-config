@@ -150,6 +150,8 @@ if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, "/")}`) {
     const out = write(text, fmt, key, val);
     const back = parse(out ?? "", fmt).find((e) => e.key === key)?.value;
     const untouched = fmt !== "ini" || parse(out, "ini").find((e) => e.key === "Audio::Shadows")?.value === "9";
-    console.log(f === fmt && back === val && untouched ? "ok" : "X ", fmt, "detectado:", f, "→", back);
+    const ok = f === fmt && back === val && untouched;
+    if (!ok) process.exitCode = 1; // para que la CI lo note
+    console.log(ok ? "ok" : "X ", fmt, "detectado:", f, "→", back);
   }
 }

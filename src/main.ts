@@ -36,6 +36,7 @@ const state = {
   games: null as Game[] | null,
   game: null as Game | null,
   detail: null as GameDetail | null,
+  detailError: null as string | null,
   goal: (safeGet("goal") as Goal | null) ?? "equilibrado",
   cleanAuto: true, // borrar solo la basura de las actualizaciones
   tech: null as TechState | null, // tecnologías de imagen (configuración global)
@@ -356,6 +357,7 @@ const VIEWS: Record<View, () => string> = {
         <div class="table-head"><h2>Últimos cambios</h2><span class="muted small">Puedes deshacerlos desde aquí</span></div>
         ${historyList()}
       </section>
+      <button class="link inline" data-act="error-report">${icon.info} Copiar informe de errores para pedir ayuda</button>
     `;
   },
 
@@ -571,7 +573,14 @@ function gameDetail(g: Game) {
   ];
 
   let panel: string;
-  if (!d) panel = `<div class="sk-list">${skel(5)}</div>`;
+  if (!d && state.detailError) {
+    panel = `<div class="empty">
+      <span class="empty-ic">${icon.warning}</span>
+      <p>No se pudo leer ${esc(g.name)}: ${esc(state.detailError)}</p>
+      <button class="btn" data-act="retry-detail">${icon.refresh}<span>Reintentar</span></button>
+    </div>`;
+  }
+  else if (!d) panel = `<div class="sk-list">${skel(5)}</div>`;
   else if (state.gameTab === "all") panel = d.files.length ? allSettings(d.files) : `<div class="empty"><span class="empty-ic">${icon.info}</span><p>Todavía no se ha encontrado ningún archivo de configuración de ${esc(g.name)}. Abre el juego una vez, ciérralo y vuelve aquí.</p></div>`;
   else if (state.gameTab === "calc") panel = calcPanel(d);
   else panel = recPanel(g, d, editable);
@@ -981,12 +990,13 @@ async function loadDetail() {
   const g = state.game;
   if (!g) return;
   state.detail = null;
+  state.detailError = null;
   rerender();
   try {
     const d = await api.gameDetail(g.id, state.goal);
     if (state.game === g) { state.detail = d; rerender(); }
   } catch (e) {
-    toast(errorText(e), true);
+    if (state.game === g) { state.detailError = errorText(e); rerender(); }
   }
 }
 
@@ -1248,6 +1258,13 @@ document.addEventListener("click", (e) => {
       (e) => toast(errorText(e), true),
     );
   }
+  else if (d.act === "retry-detail") loadDetail();
+  else if (d.act === "error-report") {
+    api.errorReport().then(
+      (n) => toast(n ? `Informe con ${n} ${n === 1 ? "error" : "errores"} copiado. Pégalo en un mensaje (Ctrl+V).` : "Informe copiado: no hay errores registrados."),
+      (e) => toast(errorText(e), true),
+    );
+  }
   else if (d.act === "grant") { safeSet("permiso", "1"); toast("Permiso concedido. Cada cambio te seguirá pidiendo confirmación."); rerender(); }
   else if (d.act === "recheck") {
     state.win = null;
@@ -1328,6 +1345,10 @@ window.addEventListener("focus", () => { if (state.view === "sistema" && !state.
 
 // Portadas que no cargan (sin internet, juego sin portada): se quitan y queda la inicial.
 document.addEventListener("error", (e) => { if (e.target instanceof HTMLImageElement) e.target.remove(); }, true);
+
+// Fallos de la propia interfaz: al registro local (los del sistema ya se registran en el proceso principal).
+window.addEventListener("error", (e) => { api.logError(`${e.message} (${e.filename}:${e.lineno})`).catch(() => {}); });
+window.addEventListener("unhandledrejection", (e) => { api.logError(errorText(e.reason)).catch(() => {}); });
 
 // Juego nuevo instalado (o desinstalado): la lista se actualiza sola.
 api.onGamesChanged(async (added) => {

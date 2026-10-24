@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Menu, Tray, clipboard, ipcMain, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, Menu, Tray, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
 import { fileURLToPath } from "node:url";
-import { watch, statfsSync, existsSync, cpSync } from "node:fs";
+import { watch, statfsSync, existsSync, cpSync, appendFileSync, statSync, renameSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import * as system from "./system.js";
 import * as win from "./windows.js";
@@ -35,6 +36,31 @@ if (!app.requestSingleInstanceLock()) app.quit();
 Menu.setApplicationMenu(null);
 // Sin aceleración por GPU: la interfaz es sencilla y así la gráfica queda entera para el juego (también el overlay).
 app.disableHardwareAcceleration();
+
+/* ---------- Registro de errores (solo en este PC: nunca se envía a ningún sitio) ---------- */
+const logFile = () => path.join(app.getPath("userData"), "errores.log");
+// La carpeta del usuario se cambia por %USERPROFILE%: así el informe se puede compartir sin el nombre de la cuenta.
+// Con \ o / y sin distinguir mayúsculas (las rutas de la interfaz llegan como file:///C:/Users/...).
+const homeRe = new RegExp(os.homedir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\\/g, "[\\\\/]"), "gi");
+const anon = (t) => String(t).replace(homeRe, "%USERPROFILE%");
+function logError(where, e) {
+  try {
+    const f = logFile();
+    if (existsSync(f) && statSync(f).size > 500 * 1024) {
+      rmSync(`${f}.old`, { force: true });
+      renameSync(f, `${f}.old`);
+    }
+    const msg = e instanceof Error ? `${e.message}${e.stack ? ` | ${e.stack.split("\n").slice(1, 4).map((l) => l.trim()).join(" | ")}` : ""}` : String(e);
+    appendFileSync(f, `${new Date().toISOString()} [${where}] ${anon(msg).replace(/\s*\n\s*/g, " | ").slice(0, 2000)}\n`);
+  } catch { /* si no se puede escribir el registro, no se rompe nada más */ }
+}
+// Un fallo sin capturar puede dejar el proceso a medias: se registra, se avisa y se cierra (no se sigue como si nada).
+process.on("uncaughtException", (e) => {
+  logError("principal", e);
+  dialog.showErrorBox("Gamer Config", "Ha ocurrido un error inesperado y la app se va a cerrar. Vuelve a abrirla; el error queda guardado en el informe de errores (Resumen).");
+  app.exit(1);
+});
+process.on("unhandledRejection", (e) => logError("principal", e));
 
 let mainWindow = null;
 
@@ -223,6 +249,21 @@ const handlers = {
     clipboard.writeText(lines.join("\n"));
     return true;
   },
+  // Errores de la interfaz (recortados: no se confía en el tamaño de lo que llega).
+  "log-error": (msg) => logError("interfaz", String(msg).slice(0, 2000)),
+  // Informe para pedir ayuda: equipo + últimos errores, al portapapeles. El usuario decide si lo comparte.
+  "error-report": async () => {
+    const hw = await system.hardware().catch(() => null);
+    const read = (f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } };
+    const last = `${read(`${logFile()}.old`)}${read(logFile())}`.split("\n").filter(Boolean).slice(-50);
+    clipboard.writeText([
+      `Gamer Config ${app.getVersion()} · Windows ${os.release()} · ${hw ? `${hw.gpu} · ${hw.cpu} · ${hw.ramGb} GB` : "equipo no detectado"}`,
+      "",
+      last.length ? `ÚLTIMOS ERRORES (${last.length})` : "Sin errores registrados.",
+      ...last,
+    ].join("\n"));
+    return last.length;
+  },
   "game-restore": async (id) => {
     const msg = await optimize.restoreOriginal(gameById(id));
     await listGames();
@@ -295,7 +336,12 @@ const handlers = {
   },
 };
 
-for (const [ch, fn] of Object.entries(handlers)) ipcMain.handle(ch, (_e, ...args) => fn(...args));
+// Todo error que llega a la interfaz queda también en el registro.
+for (const [ch, fn] of Object.entries(handlers)) {
+  ipcMain.handle(ch, async (_e, ...args) => {
+    try { return await fn(...args); } catch (e) { logError(ch, e); throw e; }
+  });
+}
 
 /* ---------- Actualizaciones (desde las versiones publicadas en GitHub) ---------- */
 

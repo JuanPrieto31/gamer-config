@@ -199,17 +199,70 @@ async function checkCleanup() {
   }
 }
 
+// Perfiles: lo que la app no comprueba al descargarlos de main (claves, niveles, versiones) y una escritura de prueba
+// sobre un archivo real de cada juego (test/fixtures/<id>.*, sin datos personales). Así sirve también sin juegos instalados.
+async function checkProfiles() {
+  const dir = path.join(import.meta.dirname, "..", "profiles");
+  const fixtures = path.join(import.meta.dirname, "..", "test", "fixtures");
+  const index = JSON.parse(await fs.readFile(path.join(dir, "index.json"), "utf8")).profiles;
+  // Perfiles de juegos y de motores (engines/: Unreal y genérico, sin ruta propia); todos llegan en vivo desde main.
+  const files = [
+    ...(await fs.readdir(dir)).filter((f) => f.endsWith(".json") && f !== "index.json"),
+    ...(await fs.readdir(path.join(dir, "engines"))).filter((f) => f.endsWith(".json")).map((f) => `engines/${f}`),
+  ];
+  const samples = await fs.readdir(fixtures).catch(() => []);
+  let ok = true;
+  for (const e of index.filter((x) => !files.includes(x.file))) { ok = false; console.log(`X  index.json apunta a ${e.file}, que no existe`); }
+  for (const f of files) {
+    const p = JSON.parse(await fs.readFile(path.join(dir, f), "utf8"));
+    const engine = f.startsWith("engines/");
+    const entry = index.find((e) => e.file === f);
+    const errs = [];
+    if (!entry) errs.push("no está en index.json");
+    else if (entry.id !== p.id || entry.version !== p.version) errs.push(`index.json dice ${entry.id} v${entry.version}, el perfil ${p.id} v${p.version}`);
+    if (!engine && !Array.isArray(p.games) && !Array.isArray(p.names)) errs.push("sin games ni names");
+    if (!engine && (!p.config?.path || !optimize.FORMATS[p.config.format])) errs.push(`formato o ruta no válidos (${p.config?.format})`);
+    if (!Array.isArray(p.settings) || p.settings.length === 0) errs.push("sin ajustes");
+    for (const s of p.settings ?? []) {
+      if (typeof s.key !== "string" || !s.key) errs.push("ajuste sin clave");
+      else if (!s.fixed && !(Array.isArray(s.levels) && s.levels.length > 0
+        && s.levels.every((l) => Array.isArray(l) && typeof l[0] === "string" && typeof l[1] === "string" && typeof l[2] === "number"))) {
+        errs.push(`${s.key}: niveles mal formados`);
+      }
+    }
+    const sample = engine ? null : samples.find((x) => x.startsWith(`${p.id}.`));
+    if (sample && errs.length === 0) {
+      const text = await fs.readFile(path.join(fixtures, sample), "utf8");
+      const game = { id: p.games?.[0] ?? `prueba-${p.id}`, name: p.names?.[0] ?? p.name, store: "Prueba", path: null };
+      for (const goal of ["fps", "equilibrado", "calidad"]) {
+        const r = await optimize.dryRun(game, goal, text);
+        if (r.kind !== "perfil") errs.push(`[${goal}] no usa su perfil (${r.kind})`);
+        if (r.failed.length) errs.push(`[${goal}] no se releen: ${r.failed.join(", ")}`);
+        if (r.linesAfter !== r.linesBefore) errs.push(`[${goal}] cambia el número de líneas (${r.linesBefore} → ${r.linesAfter})`);
+        if (goal === "equilibrado" && r.missing.length) console.log(`   ${p.id}: claves que no están en el archivo de ejemplo: ${r.missing.join(", ")}`);
+      }
+    }
+    if (errs.length) ok = false;
+    console.log(`${errs.length ? "X " : "ok"} perfil ${p.id}${sample ? ` (probado con ${sample})` : " (sin archivo de ejemplo)"}${errs.length ? ": " + errs.join(" · ") : ""}`);
+  }
+  return ok;
+}
+
 app.whenReady().then(async () => {
   let ok = checkCalc();
+  try { ok = (await checkProfiles()) && ok; } catch (e) { ok = false; console.error("FALLO perfiles", e); }
   try { ok = (await checkTech()) && ok; } catch (e) { ok = false; console.error("FALLO tecnologías", e); }
   try { ok = (await checkCleanup()) && ok; } catch (e) { ok = false; console.error("FALLO limpieza", e); }
   try {
     console.log("HW", JSON.stringify(await system.hardware()));
     const ws = await win.state(await system.hardware());
     console.log(`WIN ${ws.items.length} optimizaciones, ${ws.items.filter((i) => i.done).length} aplicadas`);
-    const first = await optimize.dryRun((await system.games())[0], "equilibrado");
-    for (const f of first.factors) console.log(`   [${f.effect}] ${f.label}: ${f.value} · ${f.note}`);
-    for (const g of await system.games()) {
+    const games = await system.games();
+    if (games.length) {
+      const first = await optimize.dryRun(games[0], "equilibrado");
+      for (const f of first.factors) console.log(`   [${f.effect}] ${f.label}: ${f.value} · ${f.note}`);
+    } else console.log("   (no hay juegos instalados: solo se prueban los perfiles con sus archivos de ejemplo)");
+    for (const g of games) {
       for (const goal of ["fps", "equilibrado", "calidad"]) {
         const r = await optimize.dryRun(g, goal);
         const bad = r.failed.length > 0 || r.linesAfter !== r.linesBefore;

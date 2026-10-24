@@ -1,0 +1,26 @@
+# Comprobación en cada push y PR: tipos, interfaz, formatos y perfiles.
+# Los perfiles de main llegan en vivo a todos los usuarios: un perfil roto no debe pasar de aquí.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  comprobar:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tipos y compilación de la interfaz
+        run: npm run build
+      - name: Formatos de configuración (ida y vuelta)
+        run: node electron/configparse.js
+      - name: Autotest (cálculo, perfiles con archivos de ejemplo, limpieza)
+        run: npm test

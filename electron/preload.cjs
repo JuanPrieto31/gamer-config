@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("afina", {
   applyGame: call("game-apply"),
   restoreGame: call("game-restore"),
   copyReport: call("copy-report"),
+  logError: call("log-error"),
+  errorReport: call("error-report"),
   applyAll: call("games-apply-all"),
   setValues: call("game-set"),
   winState: call("win-state"),
