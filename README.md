@@ -20,6 +20,7 @@ Aplicación de escritorio para Windows que optimiza Windows y la configuración 
 - **Libera espacio tras actualizar**: cuando un juego se actualiza (Steam, Epic, Roblox), borra solo los archivos que sobran del parche (descargas a medias, versiones anteriores) para que no crezca de tamaño. Automático (se puede apagar) o a mano desde la ficha del juego, siempre con el juego cerrado.
 - **Resumen como panel de control**: el estado de drivers, programas de inicio, conexión y modo juego de un vistazo, con acceso directo a cada uno, y el historial de cambios con su botón de deshacer.
 - **Diseño rock/metal**: siempre oscuro, en negro, blanco y grises, con títulos en New Rocker y arañazos. Animaciones cortas que no gastan nada mientras juegas y respetan la opción de Windows de reducir animaciones.
+- **Informe de errores para pedir ayuda**: si algo falla, queda guardado solo en tu PC (sin tu nombre de usuario). Desde Resumen lo copias y lo pegas donde pidas ayuda. Nunca se envía solo.
 - **Segundo plano y actualizaciones automáticas**: se queda junto al reloj y se actualiza sola desde las versiones de este repositorio.
 
 Antes de cambiar un archivo de un juego se guarda una copia, y todo se puede deshacer.
